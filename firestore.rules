@@ -1,0 +1,81 @@
+// BillMinder - Firebase Security Rules
+// These rules ensure users can only access their own data.
+// 
+// IMPORTANT: Deploy these rules to your Firebase project:
+// 1. Go to Firebase Console > Firestore > Rules
+// 2. Replace existing rules with these
+// 3. Click "Publish"
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================
+    // BILL MINDER SECURITY RULES
+    // ============================================================
+    
+    // Users collection - each user has their own document
+    match /users/{userId} {
+      
+      // User can only read/write their own user document
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Bills subcollection
+      match /bills/{billId} {
+        
+        // --------------------------------------------------------
+        // CREATE: Only authenticated user can create their own bills
+        // --------------------------------------------------------
+        allow create: if request.auth != null 
+                      && request.auth.uid == userId
+                      && isValidBill(request.resource.data);
+        
+        // --------------------------------------------------------
+        // READ: Only authenticated user can read their own bills
+        // --------------------------------------------------------
+        allow read: if request.auth != null 
+                    && request.auth.uid == userId;
+        
+        // --------------------------------------------------------
+        // UPDATE: Only authenticated user can update their own bills
+        // --------------------------------------------------------
+        allow update: if request.auth != null 
+                      && request.auth.uid == userId
+                      && isValidBill(request.resource.data);
+        
+        // --------------------------------------------------------
+        // DELETE: Only authenticated user can delete their own bills
+        // --------------------------------------------------------
+        allow delete: if request.auth != null 
+                      && request.auth.uid == userId;
+      }
+    }
+    
+    // ============================================================
+    // VALIDATION FUNCTIONS
+    // ============================================================
+    
+    // Validate bill data structure
+    function isValidBill(data) {
+      return data.keys().hasAll(['name', 'amount', 'dueDate', 'repeat', 'paid', 'updatedAt'])
+             && data.name is string
+             && data.name.size() > 0
+             && data.name.size() <= 100
+             && data.amount is number
+             && data.amount >= 0
+             && data.dueDate is string
+             && data.repeat in ['one-time', 'monthly']
+             && data.paid is bool
+             && data.updatedAt is string;
+    }
+    
+    // ============================================================
+    // DENY ALL OTHER ACCESS
+    // ============================================================
+    
+    // Deny access to any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
