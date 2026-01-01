@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
 import '../models/bill.dart';
+import '../providers/settings_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -215,8 +217,9 @@ class _TotalOutstandingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>();
     final currencyFormat = NumberFormat.currency(
-      symbol: '\$',
+      symbol: settings.currencySymbol,
       decimalDigits: 2,
     );
 
@@ -313,8 +316,10 @@ class _BillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use global currency setting from SettingsProvider
+    final settings = context.watch<SettingsProvider>();
     final currencyFormat = NumberFormat.currency(
-      symbol: '\$',
+      symbol: settings.currencySymbol,
       decimalDigits: 2,
     );
     final dateFormat = DateFormat('MMM d');

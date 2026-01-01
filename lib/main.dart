@@ -4,10 +4,11 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 import 'core/app_theme.dart';
+import 'core/app_lifecycle_observer.dart';
 import 'models/bill.dart';
 import 'services/auth_service.dart';
 import 'services/local_db_service.dart';
-import 'services/sync_service.dart';
+import 'services/smart_sync_service.dart';
 import 'services/notification_service.dart';
 import 'providers/bill_provider.dart';
 import 'providers/settings_provider.dart';
@@ -33,35 +34,66 @@ void main() async {
   // Initialize Firebase with platform-specific options
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize services
-  final localDb = LocalDbService();
-  await localDb.initialize();
-
+  // Initialize auth service first to check current user
   final authService = AuthService();
-  final syncService = SyncService(localDb);
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+
+  // Get user ID: Firebase UID for signed-in users
+  // CRITICAL: This ensures each user has isolated data storage
+  String? userId;
+  if (authService.userId != null) {
+    // User is already signed in with Google
+    userId = authService.userId!;
+    print('[main] Initializing for Firebase user: $userId');
+  } else {
+    // User needs to sign in - initialize without user ID
+    // LocalDB will be initialized after sign-in
+    print('[main] No user signed in - waiting for authentication');
+  }
+
+  // Initialize services only if user is signed in
+  LocalDbService? localDb;
+  SmartSyncService? syncService;
+  NotificationService? notificationService;
+
+  if (userId != null) {
+    localDb = LocalDbService();
+    await localDb.initialize(userId);
+
+    syncService = SmartSyncService(localDb);
+    await syncService.initialize();
+
+    notificationService = NotificationService();
+    await notificationService.initialize();
+    notificationService.setUserId(userId);
+
+    // Set up sync for signed-in user
+    syncService.setUserId(authService.currentUser?.uid);
+  }
 
   // Initialize settings provider
   final settingsProvider = SettingsProvider();
   await settingsProvider.initialize();
 
-  // Set up sync if user is already signed in
-  if (authService.isSignedIn) {
-    syncService.setUserId(authService.currentUser?.uid);
+  // Add lifecycleobserver for app pause/resume sync (only if user signed in)
+  if (syncService != null) {
+    final lifecycleObserver = AppLifecycleObserver(syncService);
+    WidgetsBinding.instance.addObserver(lifecycleObserver);
   }
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => BillProvider(
-            localDb: localDb,
-            syncService: syncService,
-            notificationService: notificationService,
-            authService: authService,
+        if (localDb != null &&
+            syncService != null &&
+            notificationService != null)
+          ChangeNotifierProvider(
+            create: (_) => BillProvider(
+              localDb: localDb!,
+              syncService: syncService!,
+              notificationService: notificationService!,
+              authService: authService,
+            ),
           ),
-        ),
         ChangeNotifierProvider.value(value: settingsProvider),
       ],
       child: const BillMinderApp(),
@@ -126,24 +158,34 @@ class _AppNavigatorState extends State<AppNavigator> {
 
     AddBillSheet.show(
       context,
-      onSave: (name, amount, dueDate, repeat) async {
-        await provider.addBill(
-          name: name,
-          amount: amount,
-          dueDate: dueDate,
-          repeat: repeat,
-        );
+      onSave:
+          (
+            name,
+            amount,
+            dueDate,
+            repeat,
+            reminderPreference,
+            currencyCode,
+          ) async {
+            await provider.addBill(
+              name: name,
+              amount: amount,
+              dueDate: dueDate,
+              repeat: repeat,
+              reminderPreference: reminderPreference,
+              currencyCode: currencyCode,
+            );
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bill added successfully!'),
-              backgroundColor: Color(0xFF10B981),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      },
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Bill added successfully!'),
+                  backgroundColor: Color(0xFF10B981),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
     );
   }
 
@@ -160,14 +202,16 @@ class _AppNavigatorState extends State<AppNavigator> {
               onGoogleSignIn: () async {
                 final success = await provider.signInWithGoogle();
                 if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Signed in successfully!'),
+                      backgroundColor: Color(0xFF10B981),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                   _navigateTo(AppScreen.home);
                 }
-              },
-              onGuestContinue: () async {
-                await provider.continueAsGuest();
-                if (mounted) {
-                  _navigateTo(AppScreen.home);
-                }
+                return success;
               },
             );
 
@@ -275,7 +319,6 @@ class _AppNavigatorState extends State<AppNavigator> {
                   setState(() {}); // Refresh to show signed-in state
                 }
               },
-              isGuest: provider.isGuest,
               userEmail: provider.userEmail,
             );
         }

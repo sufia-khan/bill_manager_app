@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bill Manager Logo Options - Transparent/Outline Designs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #0F172A;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #64748B;
+            margin-bottom: 50px;
+            font-size: 1.1em;
+        }
+
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .logo-card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .logo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(249, 115, 22, 0.15);
+        }
+
+        .logo-card.selected {
+            border: 3px solid #F97316;
+            box-shadow: 0 8px 16px rgba(249, 115, 22, 0.25);
+        }
+
+        .logo-preview {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 15px;
+            background: #F97316;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .logo-name {
+            text-align: center;
+            font-weight: 600;
+            color: #0F172A;
+            margin-bottom: 5px;
+            font-size: 0.95em;
+        }
+
+        .logo-description {
+            text-align: center;
+            color: #64748B;
+            font-size: 0.85em;
+        }
+
+        /* Outline Bell Styles */
+        svg {
+            fill: none;
+            stroke: white;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .color-info {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+        }
+
+        .color-info h2 {
+            color: #0F172A;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .note {
+            background: #FFF7ED;
+            border-left: 4px solid #F97316;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            color: #64748B;
+        }
+
+        .selected-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #10B981;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .logo-card.selected .selected-indicator {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔔 Bill Manager App Logos</h1>
+        <p class="subtitle">Transparent/Outline Orange & White Designs - Click to Select</p>
+
+        <div class="logo-grid">
+            <!-- Logo 1: Classic Outline Bell -->
+            <div class="logo-card" data-logo="1">
+                <div class="logo-preview">
+                    <svg width="80" height="80" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Classic Outline</div>
+                <div class="logo-description">Traditional clean lines</div>
+            </div>
+
+            <!-- Logo 2: Minimal Bell -->
+            <div class="logo-card" data-logo="2">
+                <div class="logo-preview">
+                    <svg width="75" height="75" viewBox="0 0 24 24">
+                        <path d="M6 8A6 6 0 0 1 18 8c0 7 3 9 3 9H3s3-2 3-9" />
+                        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Minimal Bell</div>
+                <div class="logo-description">Simple & elegant</div>
+            </div>
+
+            <!-- Logo 3: Bell with Notification Dot -->
+            <div class="logo-card" data-logo="3">
+                <div class="logo-preview">
+                    <svg width="80" height="80" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        <circle cx="18" cy="6" r="3" fill="white" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Alert Bell</div>
+                <div class="logo-description">With notification dot</div>
+            </div>
+
+            <!-- Logo 4: Rounded Bell -->
+            <div class="logo-card" data-logo="4">
+                <div class="logo-preview">
+                    <svg width="75" height="75" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2a3 3 0 0 0-3 3.5A6 6 0 0 0 6 11v6l-2 2v1h16v-1l-2-2v-6a6 6 0 0 0-3-5.5A3 3 0 0 0 12 2z" />
+                        <path d="M10 20a2 2 0 1 0 4 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Rounded Style</div>
+                <div class="logo-description">Soft curved edges</div>
+            </div>
+
+            <!-- Logo 5: Modern Thin Bell -->
+            <div class="logo-card" data-logo="5">
+                <div class="logo-preview">
+                    <svg width="70" height="70" viewBox="0 0 24 24" style="stroke-width: 1.5;">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Thin Line</div>
+                <div class="logo-description">Ultra minimal stroke</div>
+            </div>
+
+            <!-- Logo 6: Bold Outline -->
+            <div class="logo-card" data-logo="6">
+                <div class="logo-preview">
+                    <svg width="85" height="85" viewBox="0 0 24 24" style="stroke-width: 2.5;">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Bold Outline</div>
+                <div class="logo-description">Strong thick lines</div>
+            </div>
+
+            <!-- Logo 7: Bell with Stand -->
+            <div class="logo-card" data-logo="7">
+                <div class="logo-preview">
+                    <svg width="75" height="75" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        <line x1="12" y1="2" x2="12" y2="6" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Bell Handle</div>
+                <div class="logo-description">With top handle</div>
+            </div>
+
+            <!-- Logo 8: Geometric Bell -->
+            <div class="logo-card" data-logo="8">
+                <div class="logo-preview">
+                    <svg width="75" height="75" viewBox="0 0 24 24">
+                        <path d="M12 2L6 8v9h12V8L12 2z" />
+                        <path d="M10 20h4" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Geometric</div>
+                <div class="logo-description">Angular modern shape</div>
+            </div>
+
+            <!-- Logo 9: Curved Bell -->
+            <div class="logo-card" data-logo="9">
+                <div class="logo-preview">
+                    <svg width="78" height="78" viewBox="0 0 24 24">
+                        <path d="M8 17H16" />
+                        <path d="M12 3C12 3 9 5 9 9V17" />
+                        <path d="M12 3C12 3 15 5 15 9V17" />
+                        <path d="M10 20C10 21.1 10.9 22 12 22C13.1 22 14 21.1 14 20" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Curved Lines</div>
+                <div class="logo-description">Flowing design</div>
+            </div>
+
+            <!-- Logo 10: Simple Notification -->
+            <div class="logo-card" data-logo="10">
+                <div class="logo-preview">
+                    <svg width="72" height="72" viewBox="0 0 24 24">
+                        <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
+                        <path d="M21 17H3s2-7 2-10a7 7 0 1 1 14 0c0 3 2 10 2 10z" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Simple Alert</div>
+                <div class="logo-description">Clear notification style</div>
+            </div>
+
+            <!-- Logo 11: Double Line Bell -->
+            <div class="logo-card" data-logo="11">
+                <div class="logo-preview">
+                    <svg width="80" height="80" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M17 9A5 5 0 0 0 7 9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Double Line</div>
+                <div class="logo-description">Layered outline effect</div>
+            </div>
+
+            <!-- Logo 12: Ringing Bell -->
+            <div class="logo-card" data-logo="12">
+                <div class="logo-preview">
+                    <svg width="82" height="82" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        <path d="M2 8h2" />
+                        <path d="M20 8h2" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Ringing Bell</div>
+                <div class="logo-description">Animated sound waves</div>
+            </div>
+
+            <!-- Logo 13: Compact Bell -->
+            <div class="logo-card" data-logo="13">
+                <div class="logo-preview">
+                    <svg width="70" height="70" viewBox="0 0 24 24">
+                        <path d="M17 14V9a5 5 0 1 0-10 0v5l-2 2v1h14v-1z" />
+                        <path d="M10 20h4" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Compact</div>
+                <div class="logo-description">Space efficient design</div>
+            </div>
+
+            <!-- Logo 14: Bell with Arc -->
+            <div class="logo-card" data-logo="14">
+                <div class="logo-preview">
+                    <svg width="76" height="76" viewBox="0 0 24 24">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M8 17h8" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Arc Base</div>
+                <div class="logo-description">Bottom arc detail</div>
+            </div>
+
+            <!-- Logo 15: Modern Minimal -->
+            <div class="logo-card" data-logo="15">
+                <div class="logo-preview">
+                    <svg width="74" height="74" viewBox="0 0 24 24" style="stroke-width: 1.8;">
+                        <path d="M6 11a6 6 0 0 1 12 0c0 5 2 7 2 7H4s2-2 2-7z" />
+                        <path d="M10 21h4" />
+                    </svg>
+                    <div class="selected-indicator">✓</div>
+                </div>
+                <div class="logo-name">Modern Minimal</div>
+                <div class="logo-description">Contemporary clean look</div>
+            </div>
+        </div>
+
+        <div class="color-info">
+            <h2>🎨 Design Specifications</h2>
+            <p style="color: #64748B; margin-bottom: 15px;">
+                <strong>Background:</strong> Professional Orange #F97316<br>
+                <strong>Icon:</strong> White Transparent/Outline<br>
+                <strong>Style:</strong> Stroke-based, not filled
+            </p>
+            <div class="note">
+                <strong>💡 How to Use:</strong> Click on any logo to select it (you'll see a green checkmark). You can
+                select multiple favorites! Once you've chosen, let me know the number(s) and I'll generate high-quality
+                PNG files for your app.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add click handler to show selection
+        document.querySelectorAll('.logo-card').forEach((card) => {
+            card.addEventListener('click', function () {
+                // Toggle selection
+                this.classList.toggle('selected');
+
+                const logoNum = this.getAttribute('data-logo');
+                const logoName = this.querySelector('.logo-name').textContent;
+
+                // Get all selected logos
+                const selected = Array.from(document.querySelectorAll('.logo-card.selected'))
+                    .map(c => c.getAttribute('data-logo'));
+
+                console.log(`Selected logos: ${selected.join(', ')}`);
+            });
+        });
+    </script>
+</body>
+
+</html>

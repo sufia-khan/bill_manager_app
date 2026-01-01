@@ -2,13 +2,65 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Auth Screen - Google Sign-in and Guest entry
-/// Clean, minimal layout matching TSX reference
-class AuthScreen extends StatelessWidget {
-  final VoidCallback? onGoogleSignIn;
-  final VoidCallback? onGuestContinue;
+/// Auth Screen - Google Sign-in
+/// Clean, minimal layout
+class AuthScreen extends StatefulWidget {
+  final Future<bool> Function()? onGoogleSignIn;
 
-  const AuthScreen({super.key, this.onGoogleSignIn, this.onGuestContinue});
+  const AuthScreen({super.key, this.onGoogleSignIn});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  bool _isSigningIn = false;
+  String? _errorMessage;
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_isSigningIn || widget.onGoogleSignIn == null) return;
+
+    setState(() {
+      _isSigningIn = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await widget.onGoogleSignIn!();
+
+      if (!success && mounted) {
+        setState(() {
+          _errorMessage = 'Sign-in was cancelled or failed. Please try again.';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: const Color(0xFFF43F5E),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Sign-in failed: ${e.toString()}';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: const Color(0xFFF43F5E),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSigningIn = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,18 +73,19 @@ class AuthScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 2),
 
-              // Welcome illustration/icon
+              // Welcome illustration/icon - App Logo
               Container(
                 width: 140,
                 height: 140,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 64,
-                  color: AppColors.primary,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(70),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 140,
+                    height: 140,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -70,45 +123,10 @@ class AuthScreen extends StatelessWidget {
 
               const Spacer(flex: 2),
 
-              // Google Sign In Button
-              _GoogleSignInButton(onPressed: onGoogleSignIn),
-              const SizedBox(height: 16),
-
-              // Divider with "or"
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: AppColors.border)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'or',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                  const Expanded(child: Divider(color: AppColors.border)),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Continue as Guest Button
-              _GuestButton(onPressed: onGuestContinue),
-              const SizedBox(height: 16),
-
-              // Info text
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'Guest data is stored locally only.\nSign in to sync across devices.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                    height: 1.4,
-                  ),
-                ),
+              // Google Sign In Button with loading state
+              _GoogleSignInButton(
+                onPressed: _isSigningIn ? null : _handleGoogleSignIn,
+                isLoading: _isSigningIn,
               ),
 
               const Spacer(),
@@ -123,8 +141,9 @@ class AuthScreen extends StatelessWidget {
 /// Google Sign In Button Widget
 class _GoogleSignInButton extends StatelessWidget {
   final VoidCallback? onPressed;
+  final bool isLoading;
 
-  const _GoogleSignInButton({this.onPressed});
+  const _GoogleSignInButton({this.onPressed, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -142,82 +161,47 @@ class _GoogleSignInButton extends StatelessWidget {
             side: const BorderSide(color: AppColors.border, width: 1.5),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Google Icon (simplified)
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Center(
-                child: Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+        child: isLoading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: AppColors.primary,
                 ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Google Icon (simplified)
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Continue with Google',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Continue with Google',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Guest Continue Button Widget
-class _GuestButton extends StatelessWidget {
-  final VoidCallback? onPressed;
-
-  const _GuestButton({this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.textSecondary,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          side: const BorderSide(color: AppColors.border, width: 1.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.person_outline_rounded,
-              size: 22,
-              color: AppColors.textSecondary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Continue as Guest',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
+import '../core/reminder_config.dart';
 import '../models/bill.dart';
+import '../providers/settings_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -24,8 +27,10 @@ class BillDetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Use global currency setting from SettingsProvider
+    final settings = context.watch<SettingsProvider>();
     final currencyFormat = NumberFormat.currency(
-      symbol: '\$',
+      symbol: settings.currencySymbol,
       decimalDigits: 2,
     );
     final dateFormat = DateFormat('EEEE, MMMM d, yyyy');
@@ -122,6 +127,58 @@ class BillDetailView extends StatelessWidget {
                             label: 'Frequency',
                             value: bill.isMonthly ? 'Monthly' : 'One-time',
                           ),
+                          const Divider(height: 24),
+                          _DetailRow(
+                            icon: Icons.notifications_active_rounded,
+                            label: 'Reminder',
+                            value: bill.reminderPreference.displayName,
+                          ),
+                          // Show notification time when not paid
+                          if (!bill.paid) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.alarm_rounded,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Notification scheduled',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          bill.notificationTimeDescription,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           if (bill.isSyncPending) ...[
                             const Divider(height: 24),
                             _DetailRow(

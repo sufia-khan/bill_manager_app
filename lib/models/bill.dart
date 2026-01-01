@@ -1,12 +1,36 @@
 import 'package:hive/hive.dart';
+import '../core/reminder_config.dart';
+import '../data/currencies.dart';
+import '../models/currency.dart';
 
 part 'bill.g.dart';
 
 /// Bill status enum for UI display
 enum BillStatus { upcoming, overdue, paid }
 
-/// Sync status for offline-first architecture
-enum SyncStatus { pending, synced }
+/// Sync status for production offline-first architecture with dirty flags
+/// - clean: No pending changes, in sync with cloud
+/// - created: New bill not yet uploaded to cloud
+/// - updated: Existing bill modified locally
+/// - deleted: Bill marked for deletion from cloud
+enum BillSyncStatus {
+  clean, // No changes needed
+  created, // New bill awaiting first upload
+  updated, // Modified bill awaiting update
+  deleted; // Bill marked for cloud deletion
+
+  String get value => name;
+
+  static BillSyncStatus fromString(String value) {
+    return BillSyncStatus.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => BillSyncStatus.created,
+    );
+  }
+
+  /// Check if this bill needs to be synced to cloud
+  bool get isDirty => this != BillSyncStatus.clean;
+}
 
 /// Bill model with Hive adapter for local storage
 ///
@@ -38,13 +62,76 @@ class Bill extends HiveObject {
   @HiveField(5)
   bool paid;
 
-  /// Sync status for offline-first: 'pending' or 'synced'
+  /// Dirty flag sync status: clean | created | updated | deleted
+  /// Used to track which bills need cloud sync
   @HiveField(6)
-  String syncStatus;
+  String syncStatusValue;
 
-  /// Last update timestamp (used for sync conflict resolution)
+  /// Last update timestamp (for conflict resolution during sync)
+  /// This is the user-facing "when was bill modified" timestamp
   @HiveField(7)
   DateTime updatedAt;
+
+  /// Reminder preference: 'one_day_before' or 'same_day'
+  /// Determines when notification should be triggered
+  @HiveField(8)
+  String reminderPreferenceValue;
+
+  ///Currency code for this bill (ISO 4217)
+  /// Allows each bill to have its own currency
+  @HiveField(9)
+  String currencyCode;
+
+  /// Version number for optimistic locking and conflict detection
+  /// Incremented on every local change
+  @HiveField(10)
+  int version;
+
+  /// Last modified timestamp (for incremental cloud pulls)
+  /// Updated only on actual data changes, used for lastSyncTime comparisons
+  @HiveField(11)
+  DateTime lastModified;
+
+  // ==================== COMPUTED PROPERTIES ====================
+
+  /// Get sync status as enum
+  BillSyncStatus get syncStatus => BillSyncStatus.fromString(syncStatusValue);
+
+  /// Set sync status from enum
+  set syncStatus(BillSyncStatus status) {
+    syncStatusValue = status.value;
+  }
+
+  /// Get the reminder preference as enum
+  ReminderPreference get reminderPreference =>
+      ReminderPreferenceExtension.fromStorageValue(reminderPreferenceValue);
+
+  /// Set the reminder preference from enum
+  set reminderPreference(ReminderPreference value) {
+    reminderPreferenceValue = value.storageValue;
+  }
+
+  /// Get the calculated notification time for this bill
+  DateTime get notificationTime => ReminderConfig.calculateNotificationTime(
+    dueDate: dueDate,
+    preference: reminderPreference,
+  );
+
+  /// Get human-readable description of notification timing
+  String get notificationTimeDescription =>
+      ReminderConfig.getNotificationTimeDescription(
+        dueDate: dueDate,
+        preference: reminderPreference,
+      );
+
+  /// Get the Currency object for this bill
+  Currency get currency => CurrencyData.fromCode(currencyCode);
+
+  /// Get the currency symbol for this bill
+  String get currencySymbol => currency.safeSymbol;
+
+  /// Format the bill amount with currency symbol
+  String get formattedAmount => currency.formatAmount(amount);
 
   /// Constructor
   Bill({
@@ -54,9 +141,14 @@ class Bill extends HiveObject {
     required this.dueDate,
     this.repeat = 'one-time',
     this.paid = false,
-    this.syncStatus = 'pending',
+    this.syncStatusValue = 'created',
+    this.reminderPreferenceValue = 'one_day_before',
+    this.currencyCode = 'INR',
+    this.version = 1,
     DateTime? updatedAt,
-  }) : updatedAt = updatedAt ?? DateTime.now();
+    DateTime? lastModified,
+  }) : updatedAt = updatedAt ?? DateTime.now(),
+       lastModified = lastModified ?? DateTime.now();
 
   /// Get the bill status based on due date and paid state
   BillStatus get status {
@@ -76,22 +168,78 @@ class Bill extends HiveObject {
   /// Check if bill is one-time
   bool get isOneTime => repeat == 'one-time';
 
-  /// Check if sync is pending
-  bool get isSyncPending => syncStatus == 'pending';
+  // ==================== DIRTY FLAG METHODS ====================
 
-  /// Check if synced to cloud
-  bool get isSynced => syncStatus == 'synced';
+  /// Check if this bill needs to be synced to cloud
+  bool get isDirty => syncStatus.isDirty;
 
-  /// Mark as needing sync
-  void markPendingSync() {
-    syncStatus = 'pending';
+  /// Check if bill is clean (no pending changes)
+  bool get isClean => syncStatus == BillSyncStatus.clean;
+
+  /// Check if bill was just created (not yet on cloud)
+  bool get isCreated => syncStatus == BillSyncStatus.created;
+
+  /// Check if bill was updated locally
+  bool get isUpdated => syncStatus == BillSyncStatus.updated;
+
+  /// Check if bill is marked for deletion
+  bool get isDeleted => syncStatus == BillSyncStatus.deleted;
+
+  /// Mark bill as created (new bill awaiting first upload)
+  void markAsCreated() {
+    syncStatus = BillSyncStatus.created;
+    version++;
+    lastModified = DateTime.now();
     updatedAt = DateTime.now();
   }
 
-  /// Mark as synced
-  void markSynced() {
-    syncStatus = 'synced';
+  /// Mark bill as updated (existing bill with local changes)
+  void markAsUpdated() {
+    // Don't override 'created' status - new bills stay 'created' until first sync
+    if (syncStatus != BillSyncStatus.created) {
+      syncStatus = BillSyncStatus.updated;
+    }
+    version++;
+    lastModified = DateTime.now();
+    updatedAt = DateTime.now();
   }
+
+  /// Mark bill as deleted (awaiting cloud deletion)
+  void markAsDeleted() {
+    syncStatus = BillSyncStatus.deleted;
+    version++;
+    lastModified = DateTime.now();
+    updatedAt = DateTime.now();
+  }
+
+  /// Mark bill as clean (successfully synced to cloud)
+  void markAsClean() {
+    syncStatus = BillSyncStatus.clean;
+    // Note: Don't increment version or update timestamps on clean
+    // These are only updated on actual data changes
+  }
+
+  /// Increment version (for manual conflict resolution)
+  void incrementVersion() {
+    version++;
+    lastModified = DateTime.now();
+  }
+
+  // ==================== LEGACY COMPATIBILITY ====================
+
+  /// Backward compatibility: Check if sync is pending (isDirty)
+  bool get isSyncPending => isDirty;
+
+  /// Backward compatibility: Check if synced (isClean)
+  bool get isSynced => isClean;
+
+  /// Backward compatibility: Mark as needing sync
+  void markPendingSync() => markAsUpdated();
+
+  /// Backward compatibility: Mark as synced
+  void markSynced() => markAsClean();
+
+  // ==================== COPY WITH ====================
 
   /// Create a copy of this bill with updated fields
   Bill copyWith({
@@ -101,8 +249,12 @@ class Bill extends HiveObject {
     DateTime? dueDate,
     String? repeat,
     bool? paid,
-    String? syncStatus,
+    String? syncStatusValue,
+    String? reminderPreferenceValue,
+    String? currencyCode,
+    int? version,
     DateTime? updatedAt,
+    DateTime? lastModified,
   }) {
     return Bill(
       id: id ?? this.id,
@@ -111,10 +263,17 @@ class Bill extends HiveObject {
       dueDate: dueDate ?? this.dueDate,
       repeat: repeat ?? this.repeat,
       paid: paid ?? this.paid,
-      syncStatus: syncStatus ?? this.syncStatus,
+      syncStatusValue: syncStatusValue ?? this.syncStatusValue,
+      reminderPreferenceValue:
+          reminderPreferenceValue ?? this.reminderPreferenceValue,
+      currencyCode: currencyCode ?? this.currencyCode,
+      version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastModified: lastModified ?? this.lastModified,
     );
   }
+
+  // ==================== FIRESTORE SERIALIZATION ====================
 
   /// Convert to Map for Firestore
   Map<String, dynamic> toFirestore() {
@@ -124,7 +283,11 @@ class Bill extends HiveObject {
       'dueDate': dueDate.toIso8601String(),
       'repeat': repeat,
       'paid': paid,
+      'reminderPreference': reminderPreferenceValue,
+      'currencyCode': currencyCode,
+      'version': version,
       'updatedAt': updatedAt.toIso8601String(),
+      'lastModified': lastModified.toIso8601String(),
     };
   }
 
@@ -137,10 +300,19 @@ class Bill extends HiveObject {
       dueDate: DateTime.parse(data['dueDate'] as String),
       repeat: data['repeat'] as String? ?? 'one-time',
       paid: data['paid'] as bool? ?? false,
-      syncStatus: 'synced', // From Firestore means it's synced
+      syncStatusValue: 'clean', // From Firestore means it's synced
+      reminderPreferenceValue:
+          data['reminderPreference'] as String? ?? 'one_day_before',
+      currencyCode: data['currencyCode'] as String? ?? 'INR',
+      version: data['version'] as int? ?? 1,
       updatedAt: DateTime.parse(data['updatedAt'] as String),
+      lastModified: data['lastModified'] != null
+          ? DateTime.parse(data['lastModified'] as String)
+          : DateTime.parse(data['updatedAt'] as String),
     );
   }
+
+  // ==================== RECURRING BILLS ====================
 
   /// Create next month's bill for recurring bills
   Bill createNextMonthBill(String newId) {
@@ -153,13 +325,17 @@ class Bill extends HiveObject {
       dueDate: nextDueDate,
       repeat: repeat,
       paid: false,
-      syncStatus: 'pending',
+      syncStatusValue: 'created', // New bill awaiting sync
+      reminderPreferenceValue:
+          reminderPreferenceValue, // Inherit reminder preference
+      currencyCode: currencyCode, // Inherit currency
     );
   }
 
   @override
   String toString() {
-    return 'Bill(id: $id, name: $name, amount: $amount, dueDate: $dueDate, '
-        'repeat: $repeat, paid: $paid, syncStatus: $syncStatus)';
+    return 'Bill(id: $id, name: $name, amount: $amount, currency: $currencyCode, '
+        'dueDate: $dueDate, repeat: $repeat, paid: $paid, syncStatus: $syncStatus, '
+        'version: $version, reminderPreference: $reminderPreferenceValue)';
   }
 }

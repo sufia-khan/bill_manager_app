@@ -31,6 +31,17 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    
+    <!-- Permissions for exact alarm scheduling (bill reminders) -->
+    <!-- USE_EXACT_ALARM: Allows the app to schedule exact alarms (Android 12+) -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- SCHEDULE_EXACT_ALARM: Required for scheduling exact alarms (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- POST_NOTIFICATIONS: Required for showing notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- RECEIVE_BOOT_COMPLETED: Re-schedule alarms after device reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.

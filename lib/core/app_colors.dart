@@ -6,9 +6,11 @@ class AppColors {
   AppColors._();
 
   // Primary - Used for success, growth, and primary actions
-  static const Color primary = Color(0xFF10B981); // Emerald 500
-  static const Color primaryLight = Color(0xFF34D399); // Emerald 400
-  static const Color primaryDark = Color(0xFF059669); // Emerald 600
+  static const Color primary = Color(0xFFF97316); // Professional Orange 500
+  static const Color primaryLight = Color(
+    0xFFFB923C,
+  ); // Professional Orange 400
+  static const Color primaryDark = Color(0xFFEA580C); // Professional Orange 600
 
   // Action/Dark - Used for floating buttons and high contrast
   static const Color dark = Color(0xFF0F172A); // Slate 900
@@ -35,13 +37,13 @@ class AppColors {
 
   // Status colors
   static const Color pending = Color(0xFFF59E0B); // Amber 500
-  static const Color paid = Color(0xFF10B981); // Emerald 500
+  static const Color paid = Color(0xFFF97316); // Professional Orange 500
   static const Color overdue = Color(0xFFF43F5E); // Rose 500
 
   // Shadow colors
   static const Color shadowPrimary = Color(
-    0x1A10B981,
-  ); // Emerald with 10% opacity
+    0x1AF97316,
+  ); // Professional Orange with 10% opacity
   static const Color shadowDark = Color(
     0x1A0F172A,
   ); // Slate 900 with 10% opacity

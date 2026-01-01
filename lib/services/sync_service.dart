@@ -149,33 +149,6 @@ class SyncService {
     }
   }
 
-  /// Migrate guest data to cloud on first sign-in
-  /// Uploads all local bills to the user's Firestore
-  Future<void> migrateGuestData() async {
-    if (!canSync) return;
-
-    final online = await isOnline();
-    if (!online) return;
-
-    _isSyncing = true;
-
-    try {
-      final allBills = _localDb.getAllBills();
-
-      for (final bill in allBills) {
-        await _uploadBill(bill);
-        await _localDb.markBillSynced(bill.id);
-      }
-
-      await _localDb.setGuestMode(false);
-      await _localDb.setLastSyncTime(DateTime.now());
-    } catch (e) {
-      print('Error migrating guest data: $e');
-    } finally {
-      _isSyncing = false;
-    }
-  }
-
   /// Listen for real-time changes from Firestore
   /// Returns a stream of bills from the cloud
   Stream<List<Bill>>? listenToCloudChanges() {

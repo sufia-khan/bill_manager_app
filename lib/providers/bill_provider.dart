@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../models/bill.dart';
+import '../core/reminder_config.dart';
 import '../services/local_db_service.dart';
-import '../services/sync_service.dart';
+import '../services/smart_sync_service.dart';
 import '../services/notification_service.dart';
 import '../services/auth_service.dart';
 
@@ -18,7 +19,7 @@ import '../services/auth_service.dart';
 /// - Sort and filter support
 class BillProvider extends ChangeNotifier {
   final LocalDbService _localDb;
-  final SyncService _syncService;
+  final SmartSyncService _syncService;
   final NotificationService _notificationService;
   final AuthService _authService;
 
@@ -30,7 +31,7 @@ class BillProvider extends ChangeNotifier {
 
   BillProvider({
     required LocalDbService localDb,
-    required SyncService syncService,
+    required SmartSyncService syncService,
     required NotificationService notificationService,
     required AuthService authService,
   }) : _localDb = localDb,
@@ -73,22 +74,44 @@ class BillProvider extends ChangeNotifier {
   /// Is user signed in
   bool get isSignedIn => _authService.isSignedIn;
 
-  /// Is user in guest mode
-  bool get isGuest => _authService.isGuest;
-
   /// User email
   String? get userEmail => _authService.userEmail;
+
+  /// Notification service access for UI
+  NotificationService get notificationService => _notificationService;
+
+  // ==================== SYNC STATUS ====================
+
+  /// Number of bills pending sync
+  int get pendingSyncCount => _localDb.getDirtyBills().length;
+
+  /// Last successful sync time
+  DateTime? get lastSyncTime => _localDb.lastSyncTime;
+
+  /// Current sync state
+  SyncState get syncState => _syncService.currentState;
+
+  /// Manual sync now
+  Future<SyncResult> syncNow() async {
+    return await _syncService.syncNow();
+  }
 
   // ==================== INITIALIZATION ====================
 
   /// Load bills from local database
   Future<void> loadBills() async {
+    print('[BillProvider] 📂 === LOADING BILLS ===');
+    print('[BillProvider] User Email: $userEmail');
+    print('[BillProvider] Auth User ID: ${_authService.userId}');
+    print('[BillProvider] LocalDB User ID: ${_localDb.currentUserId}');
+
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
       _bills = _localDb.getAllBills();
+      print('[BillProvider] ✅ Loaded ${_bills.length} bills');
 
       // Schedule notifications for all unpaid bills
       await _notificationService.rescheduleAllReminders(_bills);
@@ -96,23 +119,13 @@ class BillProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
 
-      // Try to sync in background
-      _backgroundSync();
+      // Schedule initial sync
+      _syncService.scheduleDebouncedSync();
+      print('[BillProvider] 📂 === BILLS LOADED ===');
     } catch (e) {
+      print('[BillProvider] ❌ ERROR loading bills: $e');
       _error = 'Failed to load bills: $e';
       _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Background sync (won't block UI)
-  Future<void> _backgroundSync() async {
-    if (_authService.isSignedIn) {
-      _syncService.setUserId(_authService.currentUser?.uid);
-      await _syncService.fullSync();
-
-      // Reload bills after sync
-      _bills = _localDb.getAllBills();
       notifyListeners();
     }
   }
@@ -126,6 +139,8 @@ class BillProvider extends ChangeNotifier {
     required double amount,
     required DateTime dueDate,
     String repeat = 'one-time',
+    ReminderPreference reminderPreference = ReminderPreference.oneDayBefore,
+    String currencyCode = 'INR',
   }) async {
     try {
       final bill = Bill(
@@ -134,6 +149,8 @@ class BillProvider extends ChangeNotifier {
         amount: amount,
         dueDate: dueDate,
         repeat: repeat,
+        reminderPreferenceValue: reminderPreference.storageValue,
+        currencyCode: currencyCode,
       );
 
       // Save locally immediately
@@ -142,10 +159,15 @@ class BillProvider extends ChangeNotifier {
       notifyListeners();
 
       // Schedule notifications
-      await _notificationService.scheduleBillReminders(bill);
+      final notificationInfo = await _notificationService.scheduleBillReminder(
+        bill,
+      );
+      _logDebug(
+        '📅 Scheduled notification: ${notificationInfo.timeDescription}',
+      );
 
-      // Sync in background
-      _syncService.syncPendingBills();
+      // Schedule debounced sync
+      _syncService.scheduleDebouncedSync();
 
       return true;
     } catch (e) {
@@ -165,8 +187,8 @@ class BillProvider extends ChangeNotifier {
       // Reschedule notifications
       await _notificationService.scheduleBillReminders(bill);
 
-      // Sync in background
-      _syncService.syncPendingBills();
+      // Schedule debounced sync
+      _syncService.scheduleDebouncedSync();
 
       return true;
     } catch (e) {
@@ -186,7 +208,7 @@ class BillProvider extends ChangeNotifier {
       // Cancel notifications
       await _notificationService.cancelBillReminders(billId);
 
-      // Delete from cloud
+      // Delete from cloud (background)
       _syncService.deleteBillFromCloud(billId);
 
       return true;
@@ -218,8 +240,8 @@ class BillProvider extends ChangeNotifier {
         await _notificationService.scheduleBillReminders(nextBill);
       }
 
-      // Sync in background
-      _syncService.syncPendingBills();
+      // Schedule debounced sync
+      _syncService.scheduleDebouncedSync();
 
       return true;
     } catch (e) {
@@ -235,58 +257,101 @@ class BillProvider extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     try {
       _isLoading = true;
+      _error = null;
       notifyListeners();
 
       final user = await _authService.signInWithGoogle();
 
       if (user != null) {
-        // Set up sync
+        _logDebug('🔐 Sign-in successful for user: ${user.email}');
+
+        // Switch to new user's storage
+        await _localDb.switchUser(user.uid);
+        _logDebug('✅ Switched to user storage: ${user.uid}');
+
+        // Set user ID in notification service
+        _notificationService.setUserId(user.uid);
+
+        // Set up sync with user ID
         _syncService.setUserId(user.uid);
 
-        // Check if we need to migrate guest data
-        if (_localDb.isGuestMode && _bills.isNotEmpty) {
-          await _syncService.migrateGuestData();
-        }
-
-        // Full sync
+        // Full sync to get cloud data
+        _logDebug('🔄 Starting full sync...');
         await _syncService.fullSync();
+
+        // Reload bills from user's storage
         _bills = _localDb.getAllBills();
 
-        await _localDb.setGuestMode(false);
-      }
+        // Schedule notifications  for user's bills
+        await _notificationService.rescheduleAllReminders(_bills);
 
-      _isLoading = false;
-      notifyListeners();
-      return user != null;
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        // User cancelled the sign-in
+        _logDebug('Sign-in cancelled by user');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     } catch (e) {
-      _error = 'Failed to sign in: $e';
+      _logDebug('Sign-in error: $e');
+      _error = 'Failed to sign in: ${_getReadableError(e)}';
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  /// Continue as guest
-  Future<bool> continueAsGuest() async {
-    try {
-      await _authService.continueAsGuest();
-      await _localDb.setGuestMode(true);
-      return true;
-    } catch (e) {
-      _error = 'Failed to continue as guest: $e';
-      notifyListeners();
-      return false;
+  /// Get a user-friendly error message
+  String _getReadableError(dynamic error) {
+    final errorStr = error.toString();
+
+    if (errorStr.contains('network')) {
+      return 'Network error. Please check your internet connection.';
+    } else if (errorStr.contains('credential')) {
+      return 'Authentication failed. Please try again.';
+    } else if (errorStr.contains('cancelled') ||
+        errorStr.contains('canceled')) {
+      return 'Sign-in was cancelled.';
+    } else if (errorStr.contains('PlatformException')) {
+      // Check for common platform exceptions
+      if (errorStr.contains('sign_in_failed')) {
+        return 'Google Sign-In failed. Please check your Google Play Services.';
+      } else if (errorStr.contains('10:')) {
+        return 'Configuration error. SHA-1 fingerprint may be missing from Firebase.';
+      }
     }
+
+    return errorStr.length > 100
+        ? '${errorStr.substring(0, 100)}...'
+        : errorStr;
   }
 
   /// Sign out
   Future<void> signOut() async {
     try {
+      _logDebug('Starting sign out process...');
+
+      // Cancel all notifications for current user
+      await _notificationService.cancelAllNotifications();
+      _logDebug('Cancelled all notifications');
+
+      // Clear in-memory state
+      _bills = [];
+      notifyListeners();
+
+      // Sign out from Firebase/Google
       await _authService.signOut();
+
+      // Clear sync user ID
       _syncService.setUserId(null);
-      await _localDb.setGuestMode(true);
+
+      _logDebug('Sign out complete');
       notifyListeners();
     } catch (e) {
+      _logDebug('Sign out error: $e');
       _error = 'Failed to sign out: $e';
       notifyListeners();
     }
@@ -305,5 +370,12 @@ class BillProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Debug logging helper
+  void _logDebug(String message) {
+    if (kDebugMode) {
+      debugPrint('[BillProvider] $message');
+    }
   }
 }

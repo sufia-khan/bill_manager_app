@@ -23,15 +23,19 @@ class BillAdapter extends TypeAdapter<Bill> {
       dueDate: fields[3] as DateTime,
       repeat: fields[4] as String,
       paid: fields[5] as bool,
-      syncStatus: fields[6] as String,
-      updatedAt: fields[7] as DateTime,
+      syncStatusValue: fields[6] as String,
+      reminderPreferenceValue: fields[8] as String,
+      currencyCode: fields[9] as String,
+      version: fields[10] as int,
+      updatedAt: fields[7] as DateTime?,
+      lastModified: fields[11] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Bill obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -45,9 +49,17 @@ class BillAdapter extends TypeAdapter<Bill> {
       ..writeByte(5)
       ..write(obj.paid)
       ..writeByte(6)
-      ..write(obj.syncStatus)
+      ..write(obj.syncStatusValue)
       ..writeByte(7)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(8)
+      ..write(obj.reminderPreferenceValue)
+      ..writeByte(9)
+      ..write(obj.currencyCode)
+      ..writeByte(10)
+      ..write(obj.version)
+      ..writeByte(11)
+      ..write(obj.lastModified);
   }
 
   @override

@@ -18,9 +18,6 @@ class AuthService {
   /// Check if user is signed in with Google
   bool get isSignedIn => currentUser != null;
 
-  /// Check if user is in guest mode
-  bool get isGuest => currentUser == null;
-
   /// Get user email if signed in
   String? get userEmail => currentUser?.email;
 
@@ -30,23 +27,38 @@ class AuthService {
   /// Stream of auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  /// Get stable user ID for data isolation
+  /// Returns Firebase UID for signed-in users, null for guests
+  /// CRITICAL: This is used to scope local storage per user
+  String? get userId => currentUser?.uid;
+
   /// Sign in with Google
   ///
   /// Returns the signed-in user or null if cancelled/failed
   /// If user was previously a guest, caller should handle data migration
   Future<User?> signInWithGoogle() async {
     try {
+      print('[AuthService] Starting Google Sign-In flow...');
+
       // Trigger the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         // User cancelled the sign-in
+        print('[AuthService] User cancelled Google Sign-In');
         return null;
       }
+
+      print('[AuthService] Google account selected: ${googleUser.email}');
+      print('[AuthService] Getting authentication tokens...');
 
       // Get auth details from the request
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
+
+      print(
+        '[AuthService] Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}',
+      );
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
@@ -54,15 +66,24 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
+      print('[AuthService] Signing in to Firebase...');
+
       // Sign in to Firebase with the Google credential
       final UserCredential userCredential = await _auth.signInWithCredential(
         credential,
       );
 
+      print(
+        '[AuthService] Firebase sign-in successful! User: ${userCredential.user?.email}',
+      );
       return userCredential.user;
-    } catch (e) {
-      print('Error signing in with Google: $e');
-      return null;
+    } on FirebaseAuthException catch (e) {
+      print('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e, stackTrace) {
+      print('[AuthService] Error signing in with Google: $e');
+      print('[AuthService] Stack trace: $stackTrace');
+      rethrow;
     }
   }
 
@@ -74,16 +95,6 @@ class AuthService {
     } catch (e) {
       print('Error signing out: $e');
     }
-  }
-
-  /// Continue as guest (no-op, just returns true)
-  /// Guest data is stored locally only
-  Future<bool> continueAsGuest() async {
-    // Make sure we're signed out of any previous session
-    if (isSignedIn) {
-      await signOut();
-    }
-    return true;
   }
 
   /// Check if this is first sign-in for a user
