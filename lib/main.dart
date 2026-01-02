@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'firebase_options.dart';
 import 'core/app_theme.dart';
@@ -31,6 +32,9 @@ import 'screens/settings_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Hive for local storage
+  await Hive.initFlutter();
+
   // Initialize Firebase with platform-specific options
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
@@ -50,50 +54,46 @@ void main() async {
     print('[main] No user signed in - waiting for authentication');
   }
 
-  // Initialize services only if user is signed in
-  LocalDbService? localDb;
-  SmartSyncService? syncService;
-  NotificationService? notificationService;
+  // Initialize services - they'll be properly configured after sign-in if needed
+  // LocalDB won't open boxes until switchUser is called with a valid user ID
+  final localDb = LocalDbService();
+  final syncService = SmartSyncService(localDb);
+  await syncService.initialize();
 
-  if (userId != null) {
-    localDb = LocalDbService();
-    await localDb.initialize(userId);
-
-    syncService = SmartSyncService(localDb);
-    await syncService.initialize();
-
-    notificationService = NotificationService();
-    await notificationService.initialize();
-    notificationService.setUserId(userId);
-
-    // Set up sync for signed-in user
-    syncService.setUserId(authService.currentUser?.uid);
-  }
+  final notificationService = NotificationService();
+  await notificationService.initialize();
 
   // Initialize settings provider
   final settingsProvider = SettingsProvider();
   await settingsProvider.initialize();
 
-  // Add lifecycleobserver for app pause/resume sync (only if user signed in)
-  if (syncService != null) {
+  // If user is already signed in, initialize their data
+  if (authService.userId != null) {
+    final userId = authService.userId!;
+    print('[main] User already signed in: $userId');
+
+    await localDb.initialize(userId);
+    syncService.setUserId(userId);
+    notificationService.setUserId(userId);
+
+    // Add lifecycle observer for sync
     final lifecycleObserver = AppLifecycleObserver(syncService);
     WidgetsBinding.instance.addObserver(lifecycleObserver);
+  } else {
+    print('[main] No user signed in - will initialize after sign-in');
   }
 
   runApp(
     MultiProvider(
       providers: [
-        if (localDb != null &&
-            syncService != null &&
-            notificationService != null)
-          ChangeNotifierProvider(
-            create: (_) => BillProvider(
-              localDb: localDb!,
-              syncService: syncService!,
-              notificationService: notificationService!,
-              authService: authService,
-            ),
+        ChangeNotifierProvider(
+          create: (_) => BillProvider(
+            localDb: localDb,
+            syncService: syncService,
+            notificationService: notificationService,
+            authService: authService,
           ),
+        ),
         ChangeNotifierProvider.value(value: settingsProvider),
       ],
       child: const BillMinderApp(),
@@ -210,6 +210,15 @@ class _AppNavigatorState extends State<AppNavigator> {
                     ),
                   );
                   _navigateTo(AppScreen.home);
+                } else if (!success && mounted && provider.error != null) {
+                  // Show the user-friendly error from BillProvider
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(provider.error!),
+                      backgroundColor: const Color(0xFFF43F5E),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 }
                 return success;
               },
@@ -320,6 +329,7 @@ class _AppNavigatorState extends State<AppNavigator> {
                 }
               },
               userEmail: provider.userEmail,
+              isGuest: !provider.isSignedIn,
             );
         }
       },

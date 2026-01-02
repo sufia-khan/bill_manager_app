@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
 import '../providers/settings_provider.dart';
+import '../providers/bill_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Settings Screen - Categorized list view with consistent iconography
@@ -298,13 +299,13 @@ class _GuestAccountCard extends StatefulWidget {
 }
 
 class _GuestAccountCardState extends State<_GuestAccountCard> {
-  bool _isLoading = false;
+  bool _isWaitingForAccount = false;
 
   Future<void> _handleSignIn() async {
-    if (widget.onSignIn == null || _isLoading) return;
+    if (widget.onSignIn == null || _isWaitingForAccount) return;
 
     setState(() {
-      _isLoading = true;
+      _isWaitingForAccount = true;
     });
 
     try {
@@ -312,7 +313,7 @@ class _GuestAccountCardState extends State<_GuestAccountCard> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isWaitingForAccount = false;
         });
       }
     }
@@ -320,95 +321,107 @@ class _GuestAccountCardState extends State<_GuestAccountCard> {
 
   @override
   Widget build(BuildContext context) {
-    return _SettingsCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceDim,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_outline_rounded,
-                  size: 32,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Guest Mode',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sign in to sync your bills across devices',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSignIn,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+    return Consumer<BillProvider>(
+      builder: (context, provider, _) {
+        final isLoading = provider.isLoading;
+
+        return _SettingsCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceDim,
+                      shape: BoxShape.circle,
                     ),
-                    disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
-                    disabledForegroundColor: Colors.white.withOpacity(0.8),
+                    child: const Icon(
+                      Icons.person_outline_rounded,
+                      size: 32,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_isLoading)
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                  const SizedBox(height: 16),
+                  Text(
+                    'Guest Mode',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Sign in to sync your bills across devices',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (isLoading || _isWaitingForAccount)
+                          ? null
+                          : _handleSignIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBackgroundColor: AppColors.primary.withOpacity(
+                          0.6,
+                        ),
+                        disabledForegroundColor: Colors.white.withOpacity(0.8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isLoading)
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          else
+                            const Text(
+                              'G',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              isLoading
+                                  ? 'Signing in...'
+                                  : 'Sign in with Google',
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        )
-                      else
-                        const Text(
-                          'G',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          _isLoading ? 'Signing in...' : 'Sign in with Google',
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

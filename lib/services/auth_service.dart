@@ -35,10 +35,17 @@ class AuthService {
   /// Sign in with Google
   ///
   /// Returns the signed-in user or null if cancelled/failed
-  /// If user was previously a guest, caller should handle data migration
-  Future<User?> signInWithGoogle() async {
+  /// [onAccountSelected] is called after the user selects an account but before Firebase auth.
+  Future<User?> signInWithGoogle({Function? onAccountSelected}) async {
     try {
       print('[AuthService] Starting Google Sign-In flow...');
+
+      // Force account picker by signing out first (clears cached account)
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        print('[AuthService] Sign-out error (safe to ignore): $e');
+      }
 
       // Trigger the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -47,6 +54,11 @@ class AuthService {
         // User cancelled the sign-in
         print('[AuthService] User cancelled Google Sign-In');
         return null;
+      }
+
+      // User selected an account, notify caller
+      if (onAccountSelected != null) {
+        onAccountSelected();
       }
 
       print('[AuthService] Google account selected: ${googleUser.email}');

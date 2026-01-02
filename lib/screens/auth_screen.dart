@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
+import '../providers/bill_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Auth Screen - Google Sign-in
@@ -14,31 +16,29 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool _isSigningIn = false;
+  bool _isWaitingForAccount = false;
   String? _errorMessage;
 
   Future<void> _handleGoogleSignIn() async {
-    if (_isSigningIn || widget.onGoogleSignIn == null) return;
+    if (_isWaitingForAccount || widget.onGoogleSignIn == null) {
+      return;
+    }
 
     setState(() {
-      _isSigningIn = true;
+      _isWaitingForAccount = true;
       _errorMessage = null;
     });
 
     try {
+      // Pass a callback that will be triggered when an account is selected
+      // This allows the loading indicator to show ONLY after the user picks an account
       final success = await widget.onGoogleSignIn!();
 
       if (!success && mounted) {
         setState(() {
           _errorMessage = 'Sign-in was cancelled or failed. Please try again.';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_errorMessage!),
-            backgroundColor: const Color(0xFFF43F5E),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // Only show snackbar if it wasn't a simple cancel (handled by provider)
       }
     } catch (e) {
       if (mounted) {
@@ -56,7 +56,8 @@ class _AuthScreenState extends State<AuthScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isSigningIn = false;
+          _isWaitingForAccount = false;
+          // Note: _isSigningIn is managed by the provider/consumer
         });
       }
     }
@@ -124,9 +125,15 @@ class _AuthScreenState extends State<AuthScreen> {
               const Spacer(flex: 2),
 
               // Google Sign In Button with loading state
-              _GoogleSignInButton(
-                onPressed: _isSigningIn ? null : _handleGoogleSignIn,
-                isLoading: _isSigningIn,
+              Consumer<BillProvider>(
+                builder: (context, provider, _) {
+                  return _GoogleSignInButton(
+                    onPressed: (provider.isLoading || _isWaitingForAccount)
+                        ? null
+                        : _handleGoogleSignIn,
+                    isLoading: provider.isLoading,
+                  );
+                },
               ),
 
               const Spacer(),

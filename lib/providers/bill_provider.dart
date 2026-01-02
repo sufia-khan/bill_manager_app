@@ -254,20 +254,25 @@ class BillProvider extends ChangeNotifier {
   // ==================== AUTHENTICATION ====================
 
   /// Sign in with Google
-  Future<bool> signInWithGoogle() async {
+  Future<bool> signInWithGoogle({Function? onAccountSelected}) async {
     try {
-      _isLoading = true;
       _error = null;
-      notifyListeners();
+      // Note: We don't set _isLoading here to avoid showing loader before account picker
 
-      final user = await _authService.signInWithGoogle();
+      final user = await _authService.signInWithGoogle(
+        onAccountSelected: () {
+          _isLoading = true;
+          notifyListeners();
+          if (onAccountSelected != null) onAccountSelected();
+        },
+      );
 
       if (user != null) {
         _logDebug('🔐 Sign-in successful for user: ${user.email}');
 
-        // Switch to new user's storage
-        await _localDb.switchUser(user.uid);
-        _logDebug('✅ Switched to user storage: ${user.uid}');
+        // Initialize local database with user ID
+        await _localDb.initialize(user.uid);
+        _logDebug('✅ Initialized local DB for user: ${user.uid}');
 
         // Set user ID in notification service
         _notificationService.setUserId(user.uid);
@@ -282,7 +287,7 @@ class BillProvider extends ChangeNotifier {
         // Reload bills from user's storage
         _bills = _localDb.getAllBills();
 
-        // Schedule notifications  for user's bills
+        // Schedule notifications for user's bills
         await _notificationService.rescheduleAllReminders(_bills);
 
         _isLoading = false;
@@ -308,7 +313,10 @@ class BillProvider extends ChangeNotifier {
   String _getReadableError(dynamic error) {
     final errorStr = error.toString();
 
-    if (errorStr.contains('network')) {
+    // Check for specific Google Sign-In error codes
+    if (errorStr.contains('ApiException: 7')) {
+      return 'No internet connection. Please check your network and try again.';
+    } else if (errorStr.contains('network')) {
       return 'Network error. Please check your internet connection.';
     } else if (errorStr.contains('credential')) {
       return 'Authentication failed. Please try again.';
