@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/app_colors.dart';
@@ -11,6 +12,7 @@ class SettingsScreen extends StatelessWidget {
   final VoidCallback? onBack;
   final VoidCallback? onSignOut;
   final Future<void> Function()? onSignIn;
+  final VoidCallback? onAccountDeleted;
   final String? userEmail;
   final bool isGuest;
 
@@ -19,6 +21,7 @@ class SettingsScreen extends StatelessWidget {
     this.onBack,
     this.onSignOut,
     this.onSignIn,
+    this.onAccountDeleted,
     this.userEmail,
     this.isGuest = true,
   });
@@ -109,12 +112,71 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 28),
 
+                      // Help & Support Section
+                      _buildSectionTitle('Help & Diagnostics'),
+                      const SizedBox(height: 12),
+                      _SettingsCard(
+                        children: [
+                          _SettingsTile(
+                            icon: Icons.bug_report_outlined,
+                            title: 'Test Notification',
+                            subtitle: 'Send an immediate test alert',
+                            onTap: () async {
+                              final provider = context.read<BillProvider>();
+                              await provider.notificationService
+                                  .showTestNotification();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Test notification sent!'),
+                                    backgroundColor: AppColors.primary,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+
                       // Sign Out Button (if signed in)
                       if (!isGuest) ...[
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton(
                             onPressed: onSignOut,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              side: BorderSide(color: AppColors.borderLight),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.logout_rounded),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'Sign Out',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Delete Account Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => _showDeleteAccountDialog(context),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.alert,
                               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -129,11 +191,11 @@ class SettingsScreen extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.logout_rounded),
+                                const Icon(Icons.delete_forever_rounded),
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    'Sign Out',
+                                    'Delete Account',
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -285,6 +347,209 @@ class SettingsScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Show delete account confirmation dialog
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.warning_rounded,
+          color: AppColors.alert,
+          size: 48,
+        ),
+        title: Text(
+          'Delete Account?',
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This action is permanent and cannot be undone.',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.alert,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'The following will be permanently deleted:',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...['All your bills', 'Cloud backup data', 'Account settings'].map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _handleDeleteAccount(context);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.alert,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Delete Account',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Handle account deletion with loading overlay
+  Future<void> _handleDeleteAccount(BuildContext context) async {
+    final provider = context.read<BillProvider>();
+
+    // Show loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: const Color(0x66000000),
+      builder: (overlayContext) => PopScope(
+        canPop: false,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.alert,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Deleting Account...',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please wait',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Execute deletion
+    final success = await provider.deleteAccount();
+
+    // Close loading overlay
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
+    if (success) {
+      // Navigate to login screen on success
+      if (context.mounted && onAccountDeleted != null) {
+        onAccountDeleted!();
+      }
+    } else {
+      // Show error dialog
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (errorContext) => AlertDialog(
+            icon: const Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.alert,
+              size: 48,
+            ),
+            title: Text(
+              'Deletion Failed',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            content: Text(
+              provider.error ??
+                  'An error occurred while deleting your account.',
+              style: GoogleFonts.inter(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(errorContext),
+                child: const Text('OK'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(errorContext);
+                  _handleDeleteAccount(context);
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }
 

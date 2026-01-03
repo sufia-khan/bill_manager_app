@@ -6,6 +6,7 @@ import '../services/local_db_service.dart';
 import '../services/smart_sync_service.dart';
 import '../services/notification_service.dart';
 import '../services/auth_service.dart';
+import '../services/account_deletion_service.dart';
 
 /// Bill Provider - State management for all bill operations
 ///
@@ -22,11 +23,13 @@ class BillProvider extends ChangeNotifier {
   final SmartSyncService _syncService;
   final NotificationService _notificationService;
   final AuthService _authService;
+  final AccountDeletionService _accountDeletionService;
 
   final Uuid _uuid = const Uuid();
 
   List<Bill> _bills = [];
   bool _isLoading = false;
+  bool _isDeleting = false;
   String? _error;
 
   BillProvider({
@@ -37,7 +40,8 @@ class BillProvider extends ChangeNotifier {
   }) : _localDb = localDb,
        _syncService = syncService,
        _notificationService = notificationService,
-       _authService = authService;
+       _authService = authService,
+       _accountDeletionService = AccountDeletionService(notificationService);
 
   // ==================== GETTERS ====================
 
@@ -67,6 +71,9 @@ class BillProvider extends ChangeNotifier {
 
   /// Loading state
   bool get isLoading => _isLoading;
+
+  /// Account deletion in progress
+  bool get isDeleting => _isDeleting;
 
   /// Error message
   String? get error => _error;
@@ -139,8 +146,11 @@ class BillProvider extends ChangeNotifier {
     required double amount,
     required DateTime dueDate,
     String repeat = 'one-time',
-    ReminderPreference reminderPreference = ReminderPreference.oneDayBefore,
+    ReminderPreference reminderPreference =
+        ReminderPreference.none, // Default: no notifications
     String currencyCode = 'INR',
+    int reminderTimeHour = 9, // Default: 9 AM
+    int reminderTimeMinute = 0,
   }) async {
     try {
       final bill = Bill(
@@ -151,6 +161,8 @@ class BillProvider extends ChangeNotifier {
         repeat: repeat,
         reminderPreferenceValue: reminderPreference.storageValue,
         currencyCode: currencyCode,
+        reminderTimeHour: reminderTimeHour, // Pass reminder time
+        reminderTimeMinute: reminderTimeMinute,
       );
 
       // Save locally immediately
@@ -363,6 +375,75 @@ class BillProvider extends ChangeNotifier {
       _error = 'Failed to sign out: $e';
       notifyListeners();
     }
+  }
+
+  // ==================== ACCOUNT DELETION ====================
+
+  /// Delete the current user's account permanently
+  /// This will:
+  /// - Cancel all notifications
+  /// - Delete all Firestore data (bills, settings)
+  /// - Delete Firebase Authentication account
+  /// - Clear all local Hive boxes
+  /// - Clear SharedPreferences
+  /// - Reset app to fresh state
+  ///
+  /// Returns true if deletion was successful
+  /// Throws exception on error
+  Future<bool> deleteAccount() async {
+    try {
+      _isDeleting = true;
+      _error = null;
+      notifyListeners();
+
+      _logDebug('🗑️ Starting account deletion...');
+
+      // Execute account deletion
+      await _accountDeletionService.deleteAccount(
+        onProgress: (message) {
+          _logDebug('  → $message');
+        },
+      );
+
+      _logDebug('✅ Account deletion completed successfully');
+
+      // Reset all state to fresh install
+      _bills = [];
+      _isLoading = false;
+      _isDeleting = false;
+      _error = null;
+
+      // Clear sync user ID
+      _syncService.setUserId(null);
+
+      notifyListeners();
+      return true;
+    } catch (e, stackTrace) {
+      _logDebug('❌ Account deletion failed: $e');
+      _logDebug('Stack trace: $stackTrace');
+
+      _error = _getAccountDeletionErrorMessage(e);
+      _isDeleting = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Get user-friendly error message for account deletion
+  String _getAccountDeletionErrorMessage(dynamic error) {
+    final errorStr = error.toString();
+
+    if (errorStr.contains('No user is currently signed in')) {
+      return 'No user is signed in. Please sign in first.';
+    } else if (errorStr.contains('requires-recent-login')) {
+      return 'For security, please sign out and sign in again before deleting your account.';
+    } else if (errorStr.contains('network')) {
+      return 'Network error. Please check your internet connection and try again.';
+    } else if (errorStr.contains('Firestore')) {
+      return 'Failed to delete cloud data. Please try again.';
+    }
+
+    return 'Failed to delete account: $errorStr';
   }
 
   /// Get a bill by ID

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import '../core/reminder_config.dart';
 import '../data/currencies.dart';
@@ -92,6 +93,15 @@ class Bill extends HiveObject {
   @HiveField(11)
   DateTime lastModified;
 
+  /// Reminder time hour in 24-hour format (0-23)
+  /// User's preferred time to receive notifications
+  @HiveField(12)
+  int reminderTimeHour;
+
+  /// Reminder time minute (0-59)
+  @HiveField(13)
+  int reminderTimeMinute;
+
   // ==================== COMPUTED PROPERTIES ====================
 
   /// Get sync status as enum
@@ -111,10 +121,17 @@ class Bill extends HiveObject {
     reminderPreferenceValue = value.storageValue;
   }
 
+  /// Get the reminder time as TimeOfDay
+  TimeOfDay get reminderTime =>
+      TimeOfDay(hour: reminderTimeHour, minute: reminderTimeMinute);
+
   /// Get the calculated notification time for this bill
   DateTime get notificationTime => ReminderConfig.calculateNotificationTime(
     dueDate: dueDate,
     preference: reminderPreference,
+    reminderHour: reminderTimeHour,
+    reminderMinute: reminderTimeMinute,
+    referenceTime: updatedAt,
   );
 
   /// Get human-readable description of notification timing
@@ -122,6 +139,9 @@ class Bill extends HiveObject {
       ReminderConfig.getNotificationTimeDescription(
         dueDate: dueDate,
         preference: reminderPreference,
+        reminderHour: reminderTimeHour,
+        reminderMinute: reminderTimeMinute,
+        referenceTime: updatedAt,
       );
 
   /// Get the Currency object for this bill
@@ -142,9 +162,11 @@ class Bill extends HiveObject {
     this.repeat = 'one-time',
     this.paid = false,
     this.syncStatusValue = 'created',
-    this.reminderPreferenceValue = 'one_day_before',
+    this.reminderPreferenceValue = 'none', // Default: no notifications
     this.currencyCode = 'INR',
     this.version = 1,
+    this.reminderTimeHour = 9, // Default: 9 AM
+    this.reminderTimeMinute = 0,
     DateTime? updatedAt,
     DateTime? lastModified,
   }) : updatedAt = updatedAt ?? DateTime.now(),
@@ -255,6 +277,8 @@ class Bill extends HiveObject {
     int? version,
     DateTime? updatedAt,
     DateTime? lastModified,
+    int? reminderTimeHour,
+    int? reminderTimeMinute,
   }) {
     return Bill(
       id: id ?? this.id,
@@ -270,6 +294,8 @@ class Bill extends HiveObject {
       version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
       lastModified: lastModified ?? this.lastModified,
+      reminderTimeHour: reminderTimeHour ?? this.reminderTimeHour,
+      reminderTimeMinute: reminderTimeMinute ?? this.reminderTimeMinute,
     );
   }
 
@@ -288,6 +314,8 @@ class Bill extends HiveObject {
       'version': version,
       'updatedAt': updatedAt.toIso8601String(),
       'lastModified': lastModified.toIso8601String(),
+      'reminderTimeHour': reminderTimeHour,
+      'reminderTimeMinute': reminderTimeMinute,
     };
   }
 
@@ -309,6 +337,8 @@ class Bill extends HiveObject {
       lastModified: data['lastModified'] != null
           ? DateTime.parse(data['lastModified'] as String)
           : DateTime.parse(data['updatedAt'] as String),
+      reminderTimeHour: data['reminderTimeHour'] as int? ?? 9, // Default 9 AM
+      reminderTimeMinute: data['reminderTimeMinute'] as int? ?? 0,
     );
   }
 

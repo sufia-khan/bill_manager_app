@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../core/app_colors.dart';
 import '../core/reminder_config.dart';
 import '../models/bill.dart';
@@ -9,7 +10,8 @@ import 'package:intl/intl.dart';
 
 /// Bill Detail View - Focused view with large typography
 /// Shows bill details with Mark as Paid / Edit / Delete actions
-class BillDetailView extends StatelessWidget {
+/// Includes live countdown timer to next notification
+class BillDetailView extends StatefulWidget {
   final Bill bill;
   final VoidCallback? onBack;
   final VoidCallback? onMarkPaid;
@@ -24,6 +26,79 @@ class BillDetailView extends StatelessWidget {
     this.onEdit,
     this.onDelete,
   });
+
+  @override
+  State<BillDetailView> createState() => _BillDetailViewState();
+}
+
+class _BillDetailViewState extends State<BillDetailView> {
+  Timer? _countdownTimer;
+  Duration? _timeRemaining;
+  DateTime? _notificationTime; // Store the notification time once
+
+  @override
+  void initState() {
+    super.initState();
+    // Calculate RAW notification time once on init (without fallback)
+    if (widget.bill.reminderPreference != ReminderPreference.none) {
+      _notificationTime = ReminderConfig.calculateRawNotificationTime(
+        dueDate: widget.bill.dueDate,
+        preference: widget.bill.reminderPreference,
+        reminderHour: widget.bill.reminderTimeHour,
+        reminderMinute: widget.bill.reminderTimeMinute,
+        referenceTime: widget.bill.updatedAt,
+      );
+
+      // Check if already in past
+      final now = DateTime.now();
+      if (_notificationTime!.isBefore(now)) {
+        _timeRemaining = null; // Already passed, show "Notification sent"
+      }
+    }
+    _startCountdown();
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startCountdown() {
+    _updateTimeRemaining();
+    _countdownTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateTimeRemaining(),
+    );
+  }
+
+  void _updateTimeRemaining() {
+    if (widget.bill.reminderPreference == ReminderPreference.none ||
+        _notificationTime == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final remaining = _notificationTime!.difference(now);
+
+    if (mounted) {
+      setState(() {
+        _timeRemaining = remaining.isNegative ? null : remaining;
+      });
+    }
+  }
+
+  String _formatCountdown(Duration duration) {
+    if (duration.inDays > 0) {
+      return '${duration.inDays}d ${duration.inHours % 24}h';
+    } else if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes % 60}m';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m ${duration.inSeconds % 60}s';
+    } else {
+      return '${duration.inSeconds}s';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +131,7 @@ class BillDetailView extends StatelessWidget {
 
                     // Bill Name
                     Text(
-                      bill.name,
+                      widget.bill.name,
                       style: GoogleFonts.inter(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
@@ -92,7 +167,7 @@ class BillDetailView extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            currencyFormat.format(bill.amount),
+                            currencyFormat.format(widget.bill.amount),
                             style: GoogleFonts.inter(
                               fontSize: 48,
                               fontWeight: FontWeight.w900,
@@ -119,22 +194,26 @@ class BillDetailView extends StatelessWidget {
                           _DetailRow(
                             icon: Icons.calendar_today_rounded,
                             label: 'Due Date',
-                            value: dateFormat.format(bill.dueDate),
+                            value: dateFormat.format(widget.bill.dueDate),
                           ),
                           const Divider(height: 24),
                           _DetailRow(
                             icon: Icons.repeat_rounded,
                             label: 'Frequency',
-                            value: bill.isMonthly ? 'Monthly' : 'One-time',
+                            value: widget.bill.isMonthly
+                                ? 'Monthly'
+                                : 'One-time',
                           ),
                           const Divider(height: 24),
                           _DetailRow(
                             icon: Icons.notifications_active_rounded,
                             label: 'Reminder',
-                            value: bill.reminderPreference.displayName,
+                            value: widget.bill.reminderPreference.displayName,
                           ),
-                          // Show notification time when not paid
-                          if (!bill.paid) ...[
+                          // Show notification countdown when not paid and reminder is not None
+                          if (!widget.bill.paid &&
+                              widget.bill.reminderPreference !=
+                                  ReminderPreference.none) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
@@ -157,21 +236,34 @@ class BillDetailView extends StatelessWidget {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Notification scheduled',
+                                          _timeRemaining == null
+                                              ? 'Notification sent'
+                                              : 'Notification in',
                                           style: GoogleFonts.inter(
                                             fontSize: 11,
                                             color: AppColors.primary,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        Text(
-                                          bill.notificationTimeDescription,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w600,
+                                        if (_timeRemaining != null)
+                                          Text(
+                                            _formatCountdown(_timeRemaining!),
+                                            style: GoogleFonts.inter(
+                                              fontSize: 18,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: -0.5,
+                                            ),
+                                          )
+                                        else
+                                          Text(
+                                            'Check your notifications',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 13,
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -179,7 +271,7 @@ class BillDetailView extends StatelessWidget {
                               ),
                             ),
                           ],
-                          if (bill.isSyncPending) ...[
+                          if (widget.bill.isSyncPending) ...[
                             const Divider(height: 24),
                             _DetailRow(
                               icon: Icons.cloud_off_rounded,
@@ -194,11 +286,11 @@ class BillDetailView extends StatelessWidget {
                     const SizedBox(height: 32),
 
                     // Mark as Paid Button (if not paid)
-                    if (!bill.paid) ...[
+                    if (!widget.bill.paid) ...[
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: onMarkPaid,
+                          onPressed: widget.onMarkPaid,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -230,7 +322,7 @@ class BillDetailView extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: onEdit,
+                        onPressed: widget.onEdit,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 18),
@@ -261,7 +353,7 @@ class BillDetailView extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: TextButton(
-                        onPressed: onDelete,
+                        onPressed: widget.onDelete,
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.alert,
                           padding: const EdgeInsets.symmetric(vertical: 18),
@@ -298,13 +390,13 @@ class BillDetailView extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: onBack,
+            onPressed: widget.onBack,
             icon: const Icon(Icons.arrow_back_rounded),
             style: IconButton.styleFrom(foregroundColor: AppColors.textPrimary),
           ),
           const Spacer(),
           // Sync indicator
-          if (bill.isSynced)
+          if (widget.bill.isSynced)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
@@ -362,7 +454,7 @@ class BillDetailView extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    switch (bill.status) {
+    switch (widget.bill.status) {
       case BillStatus.paid:
         return AppColors.paid;
       case BillStatus.overdue:
@@ -373,7 +465,7 @@ class BillDetailView extends StatelessWidget {
   }
 
   IconData _getStatusIcon() {
-    switch (bill.status) {
+    switch (widget.bill.status) {
       case BillStatus.paid:
         return Icons.check_circle_rounded;
       case BillStatus.overdue:
@@ -384,7 +476,7 @@ class BillDetailView extends StatelessWidget {
   }
 
   String _getStatusLabel() {
-    switch (bill.status) {
+    switch (widget.bill.status) {
       case BillStatus.paid:
         return 'Paid';
       case BillStatus.overdue:

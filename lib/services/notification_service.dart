@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import '../models/bill.dart';
 import '../core/reminder_config.dart';
 
@@ -22,6 +23,7 @@ class NotificationInfo {
 /// - Schedules notifications locally
 /// - Works when app is closed
 /// - No network required
+/// - User-scoped notifications
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
@@ -40,7 +42,16 @@ class NotificationService {
 
     // Initialize timezone
     tz_data.initializeTimeZones();
-    print('[NotificationService] ⏰ Timezone initialized');
+    try {
+      final String timeZoneName = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      print('[NotificationService] ⏰ Timezone initialized: $timeZoneName');
+    } catch (e) {
+      print(
+        '[NotificationService] ⚠️ Could not get local timezone, falling back to UTC: $e',
+      );
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    }
 
     // Android settings
     const androidSettings = AndroidInitializationSettings(
@@ -150,17 +161,21 @@ class NotificationService {
 
   /// Schedule notification for a bill based on its reminder configuration
   ///
-  /// Uses ReminderConfig to automatically handle:
-  /// - Dev mode timing (30s for same day, 1min for one day before)
-  /// - Production mode timing (actual dates at user's preferred time)
-  /// - User's reminder preference (same day vs one day before)
-  /// - Edge cases (schedules 5s from now if calculated time is in past)
+  /// Handles three notification preferences:
+  /// - none: No notifications
+  /// - oneDayBefore: Single notification 1 day before due date
+  /// - sameDay: Single notification on due date
+  ///
+  /// Uses user's custom reminder time (hour:minute) for all notifications
   Future<void> scheduleBillReminders(Bill bill) async {
     print('[NotificationService] 📅 === SCHEDULING BILL REMINDER ===');
     print('[NotificationService] Bill: "${bill.name}"');
     print('[NotificationService] Due Date: ${bill.dueDate}');
     print(
       '[NotificationService] Reminder Preference: ${bill.reminderPreference.displayName}',
+    );
+    print(
+      '[NotificationService] Reminder Time: ${bill.reminderTimeHour}:${bill.reminderTimeMinute.toString().padLeft(2, '0')}',
     );
 
     if (!_isInitialized) {
@@ -174,6 +189,14 @@ class NotificationService {
       return;
     }
 
+    // Don't schedule if preference is 'none'
+    if (bill.reminderPreference == ReminderPreference.none) {
+      print(
+        '[NotificationService] 🔕 Preference is NONE, skipping notifications',
+      );
+      return;
+    }
+
     final now = DateTime.now();
     print('[NotificationService] Current Time: $now');
 
@@ -181,25 +204,94 @@ class NotificationService {
     await cancelBillReminders(bill.id);
     print('[NotificationService] 🗑️ Cancelled any existing notifications');
 
-    // Get the calculated notification time from ReminderConfig
-    // This respects dev mode, user preferences, and handles edge cases
-    final notificationTime = bill.notificationTime;
-    print(
-      '[NotificationService] 🔔 Calculated Notification Time: $notificationTime',
-    );
-    print(
-      '[NotificationService] ⏱️ Time Until Notification: ${bill.notificationTimeDescription}',
-    );
+    // Determine which notifications to schedule based on preference
+    final bool scheduleOneDayBefore =
+        bill.reminderPreference == ReminderPreference.oneDayBefore;
+    final bool scheduleSameDay =
+        bill.reminderPreference == ReminderPreference.sameDay;
 
-    // Only schedule if the notification time is in the future
-    if (notificationTime.isBefore(now)) {
-      print(
-        '[NotificationService] ⚠️ Notification time is in past, skipping: $notificationTime',
+    int scheduledCount = 0;
+
+    // Schedule "one day before" notification
+    if (scheduleOneDayBefore) {
+      final notificationTime = _calculateNotificationTime(
+        bill,
+        oneDayBefore: true,
       );
-      return;
+
+      if (notificationTime != null) {
+        await _scheduleNotification(
+          bill: bill,
+          notificationId: bill.id.hashCode.abs() % 100000,
+          notificationTime: notificationTime,
+          title: 'Bill Due Tomorrow',
+          body: '${bill.name} - ${bill.formattedAmount} is due tomorrow',
+        );
+        scheduledCount++;
+      } else {
+        print(
+          '[NotificationService] ⏭️ One day before notification time is in past, skipping',
+        );
+      }
     }
 
-    // Notification details
+    // Schedule "same day" notification
+    if (scheduleSameDay) {
+      final notificationTime = _calculateNotificationTime(
+        bill,
+        oneDayBefore: false,
+      );
+
+      if (notificationTime != null) {
+        await _scheduleNotification(
+          bill: bill,
+          notificationId: (bill.id.hashCode.abs() % 100000) + 1,
+          notificationTime: notificationTime,
+          title: 'Bill Due Today',
+          body: '${bill.name} - ${bill.formattedAmount} is due today!',
+        );
+        scheduledCount++;
+      } else {
+        print(
+          '[NotificationService] ⏭️ Same day notification time is in past, skipping',
+        );
+      }
+    }
+
+    print(
+      '[NotificationService] ✅ Scheduled $scheduledCount notification(s) for "${bill.name}"',
+    );
+    print('[NotificationService] === SCHEDULING COMPLETE ===');
+  }
+
+  /// Calculate notification time based on due date, reminder time, and whether it's one day before
+  DateTime? _calculateNotificationTime(
+    Bill bill, {
+    required bool oneDayBefore,
+  }) {
+    final preference = oneDayBefore
+        ? ReminderPreference.oneDayBefore
+        : ReminderPreference.sameDay;
+
+    return ReminderConfig.calculateNotificationTime(
+      dueDate: bill.dueDate,
+      preference: preference,
+      reminderHour: bill.reminderTimeHour,
+      reminderMinute: bill.reminderTimeMinute,
+      referenceTime: bill.updatedAt,
+      useFallback:
+          true, // Enable fallback to 5s if time is in past (especially for Dev Mode)
+    );
+  }
+
+  /// Helper method to schedule a single notification
+  Future<void> _scheduleNotification({
+    required Bill bill,
+    required int notificationId,
+    required DateTime notificationTime,
+    required String title,
+    required String body,
+  }) async {
     const androidDetails = AndroidNotificationDetails(
       'bill_reminders',
       'Bill Reminders',
@@ -220,24 +312,10 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    // Generate unique notification ID from bill ID
-    final notificationId = bill.id.hashCode.abs() % 100000;
-    print('[NotificationService] 🔢 Notification ID: $notificationId');
-
-    // Determine notification title and body based on preference
-    final isSameDay = bill.reminderPreference == ReminderPreference.sameDay;
-    final title = isSameDay ? 'Bill Due Today' : 'Bill Due Tomorrow';
-    final body = isSameDay
-        ? '${bill.name} - ${bill.formattedAmount} is due today!'
-        : '${bill.name} - ${bill.formattedAmount} is due tomorrow';
-
-    print('[NotificationService] 📝 Title: "$title"');
-    print('[NotificationService] 📝 Body: "$body"');
-
-    // Schedule the notification
     try {
       final tzDateTime = tz.TZDateTime.from(notificationTime, tz.local);
-      print('[NotificationService] 🌍 TZ DateTime: $tzDateTime');
+      print('[NotificationService] 🕒 Scheduling for: $tzDateTime');
+      print('[NotificationService] 💡 Timezone Location: ${tz.local.name}');
 
       await _notifications.zonedSchedule(
         notificationId,
@@ -251,20 +329,9 @@ class NotificationService {
         payload: bill.id,
       );
 
-      print(
-        '[NotificationService] ✅ Scheduled notification for "${bill.name}"',
-      );
-      print('[NotificationService] 📅 Due: ${bill.dueDate}');
-      print('[NotificationService] 🔔 Notify at: $notificationTime');
-      print(
-        '[NotificationService] ⏱️ Time until notification: ${bill.notificationTimeDescription}',
-      );
-      print('[NotificationService] === SCHEDULING COMPLETE ===');
+      print('[NotificationService] ✅ Scheduled: "$title" at $tzDateTime');
     } catch (e) {
       print('[NotificationService] ❌ ERROR scheduling notification: $e');
-      print(
-        '[NotificationService] 💡 This might be due to missing permissions',
-      );
       rethrow;
     }
   }

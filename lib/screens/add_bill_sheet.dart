@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 /// Add Bill Bottom Sheet - Non-intrusive data entry
-/// Fields: Name, Amount, Currency, Due Date, Repeat, Reminder Preference
+/// Fields: Name, Amount, Currency, Due Date, Repeat, Reminder Preference, Reminder Time
 /// Past dates are disabled in date picker
 class AddBillSheet extends StatefulWidget {
   final Function(
@@ -18,6 +18,7 @@ class AddBillSheet extends StatefulWidget {
     String repeat,
     ReminderPreference reminderPreference,
     String currencyCode,
+    TimeOfDay reminderTime, // Added time parameter
   )?
   onSave;
   final VoidCallback? onClose;
@@ -34,6 +35,7 @@ class AddBillSheet extends StatefulWidget {
       String repeat,
       ReminderPreference reminderPreference,
       String currencyCode,
+      TimeOfDay reminderTime, // Added time parameter
     )?
     onSave,
   }) {
@@ -57,7 +59,12 @@ class _AddBillSheetState extends State<AddBillSheet> {
 
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedRepeat = 'one-time';
-  ReminderPreference _selectedReminder = ReminderPreference.oneDayBefore;
+  ReminderPreference _selectedReminder =
+      ReminderPreference.none; // Default: no notifications
+  TimeOfDay _selectedReminderTime = const TimeOfDay(
+    hour: 9,
+    minute: 0,
+  ); // Default: 9:00 AM
   bool _isLoading = false;
 
   @override
@@ -101,6 +108,30 @@ class _AddBillSheetState extends State<AddBillSheet> {
     }
   }
 
+  Future<void> _selectTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedReminderTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              onPrimary: Colors.white,
+              surface: AppColors.surface,
+              onSurface: AppColors.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() => _selectedReminderTime = picked);
+    }
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -110,7 +141,7 @@ class _AddBillSheetState extends State<AddBillSheet> {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
     final currency = context.read<SettingsProvider>().selectedCurrency;
 
-    // Call save callback with reminder preference and currency
+    // Call save callback with reminder preference, time, and currency
     widget.onSave?.call(
       name,
       amount,
@@ -118,6 +149,7 @@ class _AddBillSheetState extends State<AddBillSheet> {
       _selectedRepeat,
       _selectedReminder,
       currency.code,
+      _selectedReminderTime, // Pass the selected time
     );
 
     // Show loader for max 2 seconds then close
@@ -134,6 +166,8 @@ class _AddBillSheetState extends State<AddBillSheet> {
     final notifyAt = ReminderConfig.calculateNotificationTime(
       dueDate: _selectedDate,
       preference: _selectedReminder,
+      reminderHour: _selectedReminderTime.hour,
+      reminderMinute: _selectedReminderTime.minute,
     );
 
     final dateFormat = DateFormat('MMM d, yyyy');
@@ -374,7 +408,7 @@ class _AddBillSheetState extends State<AddBillSheet> {
                 ),
                 const SizedBox(height: 20),
 
-                // Reminder Preference Options
+                // Reminder Preference Options - 3 options in a single row
                 Text(
                   'Remind Me',
                   style: GoogleFonts.inter(
@@ -388,14 +422,12 @@ class _AddBillSheetState extends State<AddBillSheet> {
                   children: [
                     Expanded(
                       child: _ReminderOption(
-                        label: ReminderPreference.oneDayBefore.displayName,
+                        label: ReminderPreference.none.displayName,
                         isSelected:
-                            _selectedReminder ==
-                            ReminderPreference.oneDayBefore,
-                        devModeLabel: kDebugMode ? '(1 min in dev)' : null,
+                            _selectedReminder == ReminderPreference.none,
+                        icon: Icons.notifications_off_rounded,
                         onTap: () => setState(
-                          () => _selectedReminder =
-                              ReminderPreference.oneDayBefore,
+                          () => _selectedReminder = ReminderPreference.none,
                         ),
                       ),
                     ),
@@ -405,14 +437,72 @@ class _AddBillSheetState extends State<AddBillSheet> {
                         label: ReminderPreference.sameDay.displayName,
                         isSelected:
                             _selectedReminder == ReminderPreference.sameDay,
-                        devModeLabel: kDebugMode ? '(30s in dev)' : null,
                         onTap: () => setState(
                           () => _selectedReminder = ReminderPreference.sameDay,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ReminderOption(
+                        label: ReminderPreference.oneDayBefore.displayName,
+                        isSelected:
+                            _selectedReminder ==
+                            ReminderPreference.oneDayBefore,
+                        onTap: () => setState(
+                          () => _selectedReminder =
+                              ReminderPreference.oneDayBefore,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
+
+                // Show Reminder Time picker only if not "none"
+                if (_selectedReminder != ReminderPreference.none) ...[
+                  const SizedBox(height: 20),
+                  // Reminder Time Picker
+                  Text(
+                    'Reminder Time',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _selectTime,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceDim,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.access_time_rounded,
+                            size: 20,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _selectedReminderTime.format(context),
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
 
                 // Notification Time Preview (visible for verification)
                 const SizedBox(height: 16),
@@ -578,13 +668,13 @@ class _RepeatOption extends StatelessWidget {
 class _ReminderOption extends StatelessWidget {
   final String label;
   final bool isSelected;
-  final String? devModeLabel;
+  final IconData? icon; // Optional icon
   final VoidCallback? onTap;
 
   const _ReminderOption({
     required this.label,
     required this.isSelected,
-    this.devModeLabel,
+    this.icon,
     this.onTap,
   });
 
@@ -606,6 +696,14 @@ class _ReminderOption extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(height: 4),
+            ],
             Text(
               label,
               style: GoogleFonts.inter(
@@ -615,20 +713,6 @@ class _ReminderOption extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (devModeLabel != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                devModeLabel!,
-                style: GoogleFonts.inter(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
-                  color: isSelected
-                      ? Colors.white.withOpacity(0.8)
-                      : Colors.orange.shade600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
           ],
         ),
       ),

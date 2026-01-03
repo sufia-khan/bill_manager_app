@@ -2,7 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Reminder Preference Options (when to remind relative to due date)
-enum ReminderPreference { oneDayBefore, sameDay }
+enum ReminderPreference {
+  none, // No notifications
+  oneDayBefore, // 1 day before notification
+  sameDay, // Same day notification
+}
 
 /// Reminder Time Options (what time of day to send notification)
 enum ReminderTime {
@@ -18,6 +22,8 @@ extension ReminderPreferenceExtension on ReminderPreference {
   /// Display name for UI
   String get displayName {
     switch (this) {
+      case ReminderPreference.none:
+        return 'None';
       case ReminderPreference.oneDayBefore:
         return 'One day before';
       case ReminderPreference.sameDay:
@@ -28,16 +34,20 @@ extension ReminderPreferenceExtension on ReminderPreference {
   /// Short description for UI
   String get description {
     switch (this) {
+      case ReminderPreference.none:
+        return 'No notifications';
       case ReminderPreference.oneDayBefore:
-        return 'Get reminded 1 day before due date';
+        return 'Notify 1 day before due date';
       case ReminderPreference.sameDay:
-        return 'Get reminded on the due date';
+        return 'Notify on the due date';
     }
   }
 
   /// Hive storage value
   String get storageValue {
     switch (this) {
+      case ReminderPreference.none:
+        return 'none';
       case ReminderPreference.oneDayBefore:
         return 'one_day_before';
       case ReminderPreference.sameDay:
@@ -46,13 +56,19 @@ extension ReminderPreferenceExtension on ReminderPreference {
   }
 
   /// Parse from storage value
+  /// Legacy 'both' values are converted to 'oneDayBefore' for backward compatibility
   static ReminderPreference fromStorageValue(String? value) {
     switch (value) {
+      case 'none':
+        return ReminderPreference.none;
+      case 'one_day_before':
+        return ReminderPreference.oneDayBefore;
       case 'same_day':
         return ReminderPreference.sameDay;
-      case 'one_day_before':
-      default:
+      case 'both': // Legacy value - convert to oneDayBefore
         return ReminderPreference.oneDayBefore;
+      default:
+        return ReminderPreference.none; // Default to 'none' for unknown values
     }
   }
 }
@@ -175,6 +191,8 @@ class ReminderConfig {
   /// Production mode offsets (real durations)
   static Duration _getProductionOffset(ReminderPreference preference) {
     switch (preference) {
+      case ReminderPreference.none:
+        return Duration.zero; // No notification
       case ReminderPreference.oneDayBefore:
         return const Duration(days: 1);
       case ReminderPreference.sameDay:
@@ -185,6 +203,8 @@ class ReminderConfig {
   /// Dev mode offsets (testing durations)
   static Duration _getDevModeOffset(ReminderPreference preference) {
     switch (preference) {
+      case ReminderPreference.none:
+        return Duration.zero; // No notification
       case ReminderPreference.oneDayBefore:
         // 1 day becomes 1 minute for testing
         return const Duration(minutes: 1);
@@ -198,45 +218,51 @@ class ReminderConfig {
   ///
   /// Formula: notifyAt = (dueDate - reminderOffset) at specified time
   ///
-  /// Edge Case: If calculated time is in the past,
+  /// In DEV MODE, the offset is relative to [referenceTime] (e.g. updatedAt)
+  /// to allow quick testing of notifications.
+  ///
+  /// Edge Case: If calculated time is in the past and [useFallback] is true,
   /// schedule 5 seconds from now.
   static DateTime calculateNotificationTime({
     required DateTime dueDate,
     required ReminderPreference preference,
-    ReminderTime reminderTime = ReminderTime.nineAM,
+    int? reminderHour,
+    int? reminderMinute,
+    DateTime? referenceTime,
+    bool useFallback = true,
   }) {
     final now = DateTime.now();
     final offset = getReminderOffset(preference);
 
-    // Calculate the target date (dueDate - offset)
-    DateTime targetDate = dueDate.subtract(offset);
-
-    // Set the notification time on that date
     DateTime notifyAt;
+
     if (isDevMode) {
-      // In dev mode, don't adjust time - use exact calculated time for testing
-      notifyAt = targetDate;
+      // DEV MODE: Offset is relative to when the bill was last touched (referenceTime)
+      // or now if referenceTime is not provided.
+      final base = referenceTime ?? now;
+      notifyAt = base.add(offset);
     } else {
-      // In production, set to specific time of day
+      // PRODUCTION MODE: Real durations relative to dueDate
+      DateTime targetDate = dueDate.subtract(offset);
       notifyAt = DateTime(
         targetDate.year,
         targetDate.month,
         targetDate.day,
-        reminderTime.hour,
-        0,
+        reminderHour ?? 9,
+        reminderMinute ?? 0,
         0,
       );
     }
 
-    // Edge case: If notifyAt is in the past, schedule 5 seconds from now
-    if (notifyAt.isBefore(now)) {
+    // Edge case: If notifyAt is in the past, and it's for scheduling (useFallback=true),
+    // schedule 5 seconds from now.
+    if (useFallback && notifyAt.isBefore(now)) {
       notifyAt = now.add(const Duration(seconds: 5));
       _logDebug('⚠️ Calculated time was in past, scheduling 5s from now');
     }
 
     _logDebug('📅 Due Date: $dueDate');
     _logDebug('⏰ Preference: ${preference.displayName}');
-    _logDebug('🕐 Time: ${reminderTime.displayName}');
     _logDebug('⏱️ Offset: $offset');
     _logDebug('🔔 Notify At: $notifyAt');
     _logDebug('🏗️ Mode: ${isDevMode ? "DEV" : "PRODUCTION"}');
@@ -244,16 +270,40 @@ class ReminderConfig {
     return notifyAt;
   }
 
+  /// Calculate the RAW notification time without fallback
+  /// Deprecated: Use calculateNotificationTime with useFallback: false
+  static DateTime calculateRawNotificationTime({
+    required DateTime dueDate,
+    required ReminderPreference preference,
+    int? reminderHour,
+    int? reminderMinute,
+    DateTime? referenceTime,
+  }) {
+    return calculateNotificationTime(
+      dueDate: dueDate,
+      preference: preference,
+      reminderHour: reminderHour,
+      reminderMinute: reminderMinute,
+      referenceTime: referenceTime,
+      useFallback: false,
+    );
+  }
+
   /// Get human-readable description of when notification will fire
   static String getNotificationTimeDescription({
     required DateTime dueDate,
     required ReminderPreference preference,
-    ReminderTime reminderTime = ReminderTime.nineAM,
+    int? reminderHour,
+    int? reminderMinute,
+    DateTime? referenceTime,
   }) {
     final notifyAt = calculateNotificationTime(
       dueDate: dueDate,
       preference: preference,
-      reminderTime: reminderTime,
+      reminderHour: reminderHour,
+      reminderMinute: reminderMinute,
+      referenceTime: referenceTime,
+      useFallback: true,
     );
 
     final now = DateTime.now();

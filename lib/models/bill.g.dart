@@ -27,6 +27,9 @@ class BillAdapter extends TypeAdapter<Bill> {
       reminderPreferenceValue: fields[8] as String,
       currencyCode: fields[9] as String,
       version: fields[10] as int,
+      reminderTimeHour: fields[12] as int? ?? 9, // Default 9 AM for old data
+      reminderTimeMinute:
+          fields[13] as int? ?? 0, // Default 0 minutes for old data
       updatedAt: fields[7] as DateTime?,
       lastModified: fields[11] as DateTime?,
     );
@@ -35,7 +38,7 @@ class BillAdapter extends TypeAdapter<Bill> {
   @override
   void write(BinaryWriter writer, Bill obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +62,11 @@ class BillAdapter extends TypeAdapter<Bill> {
       ..writeByte(10)
       ..write(obj.version)
       ..writeByte(11)
-      ..write(obj.lastModified);
+      ..write(obj.lastModified)
+      ..writeByte(12)
+      ..write(obj.reminderTimeHour)
+      ..writeByte(13)
+      ..write(obj.reminderTimeMinute);
   }
 
   @override

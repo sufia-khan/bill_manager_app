@@ -166,6 +166,7 @@ class _AppNavigatorState extends State<AppNavigator> {
             repeat,
             reminderPreference,
             currencyCode,
+            reminderTime, // Added time parameter
           ) async {
             await provider.addBill(
               name: name,
@@ -174,6 +175,8 @@ class _AppNavigatorState extends State<AppNavigator> {
               repeat: repeat,
               reminderPreference: reminderPreference,
               currencyCode: currencyCode,
+              reminderTimeHour: reminderTime.hour, // Pass hour
+              reminderTimeMinute: reminderTime.minute, // Pass minute
             );
 
             if (mounted) {
@@ -326,6 +329,12 @@ class _AppNavigatorState extends State<AppNavigator> {
                 final success = await provider.signInWithGoogle();
                 if (success && mounted) {
                   setState(() {}); // Refresh to show signed-in state
+                }
+              },
+              onAccountDeleted: () {
+                // Navigate to auth screen after account deletion
+                if (mounted) {
+                  _navigateTo(AppScreen.auth);
                 }
               },
               userEmail: provider.userEmail,
