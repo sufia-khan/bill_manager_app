@@ -5,6 +5,8 @@ import '../core/app_colors.dart';
 import '../providers/settings_provider.dart';
 import '../providers/bill_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
 
 /// Settings Screen - Categorized list view with consistent iconography
 /// Account section, preferences (notifications, currency), sign out, and app info
@@ -86,27 +88,33 @@ class SettingsScreen extends StatelessWidget {
                       _SettingsCard(
                         children: [
                           _SettingsTile(
-                            icon: Icons.info_outline_rounded,
-                            title: 'App Version',
-                            trailing: Text(
-                              '1.0.0',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          const Divider(height: 1),
-                          _SettingsTile(
                             icon: Icons.description_outlined,
                             title: 'Terms of Service',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TermsOfServiceScreen(
+                                    onBack: () => Navigator.pop(context),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const Divider(height: 1),
                           _SettingsTile(
                             icon: Icons.privacy_tip_outlined,
                             title: 'Privacy Policy',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PrivacyPolicyScreen(
+                                    onBack: () => Navigator.pop(context),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -117,38 +125,7 @@ class SettingsScreen extends StatelessWidget {
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton(
-                            onPressed: onSignOut,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textSecondary,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              side: BorderSide(color: AppColors.borderLight),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.logout_rounded),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'Sign Out',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Delete Account Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: () => _showDeleteAccountDialog(context),
+                            onPressed: () => _showSignOutConfirmDialog(context),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.alert,
                               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -163,12 +140,19 @@ class SettingsScreen extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.delete_forever_rounded),
+                                const Icon(
+                                  Icons.logout_rounded,
+                                  color: AppColors.alert,
+                                ),
                                 const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    'Delete Account',
+                                    'Sign Out',
                                     overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.alert,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -254,70 +238,63 @@ class SettingsScreen extends StatelessWidget {
       return _GuestAccountCard(onSignIn: onSignIn);
     }
 
-    return _SettingsCard(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    userEmail?.substring(0, 1).toUpperCase() ?? 'U',
-                    style: GoogleFonts.inter(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      userEmail ?? 'User',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.cloud_done_rounded,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Sync enabled',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return _ExpandableAccountCard(
+      userEmail: userEmail,
+      onDeleteAccount: _showDeleteAccountDialog,
+    );
+  }
+
+  /// Show sign out confirmation dialog
+  void _showSignOutConfirmDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(
+          Icons.logout_rounded,
+          color: AppColors.alert,
+          size: 48,
+        ),
+        title: Text(
+          'Sign Out?',
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
         ),
-      ],
+        content: Text(
+          'Are you sure you want to sign out of your account?',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (onSignOut != null) {
+                onSignOut!();
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.alert,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              'Sign Out',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -522,6 +499,162 @@ class SettingsScreen extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+/// Expandable Account Card - tap to reveal Delete Account option
+class _ExpandableAccountCard extends StatefulWidget {
+  final String? userEmail;
+  final void Function(BuildContext context) onDeleteAccount;
+
+  const _ExpandableAccountCard({
+    required this.userEmail,
+    required this.onDeleteAccount,
+  });
+
+  @override
+  State<_ExpandableAccountCard> createState() => _ExpandableAccountCardState();
+}
+
+class _ExpandableAccountCardState extends State<_ExpandableAccountCard>
+    with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCard(
+      children: [
+        // Account info row - tappable to expand
+        InkWell(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          borderRadius: _isExpanded
+              ? const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                )
+              : BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.userEmail?.substring(0, 1).toUpperCase() ?? 'U',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.userEmail ?? 'User',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _isExpanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 24,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Animated Delete Account section
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Divider(height: 1),
+              // Delete Account tile
+              InkWell(
+                onTap: () => widget.onDeleteAccount(context),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.alert.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.delete_forever_rounded,
+                          size: 20,
+                          color: AppColors.alert,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Delete Account',
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.alert,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Permanently remove your account and data',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 22,
+                        color: AppColors.textMuted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          crossFadeState: _isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+        ),
+      ],
+    );
   }
 }
 

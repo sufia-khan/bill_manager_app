@@ -58,17 +58,8 @@ class LocalDbService {
     final billsBoxName = _getUserBoxName('bills', userId);
     final settingsBoxName = _getUserBoxName('settings', userId);
 
-    print('[LocalDbService] 📦 === OPENING USER BOXES ===');
-    print('[LocalDbService] User ID: $userId');
-    print('[LocalDbService] Bills box name: $billsBoxName');
-    print('[LocalDbService] Settings box name: $settingsBoxName');
-
     _billsBox = await Hive.openBox<Bill>(billsBoxName);
     _settingsBox = await Hive.openBox<dynamic>(settingsBoxName);
-
-    print('[LocalDbService] ✅ Boxes opened successfully');
-    print('[LocalDbService] Bills count in this box: ${_billsBox!.length}');
-    print('[LocalDbService] 📦 === BOXES READY ===');
   }
 
   /// Close current user's boxes
@@ -76,11 +67,9 @@ class LocalDbService {
   Future<void> _closeCurrentBoxes() async {
     if (_billsBox != null && _billsBox!.isOpen) {
       await _billsBox!.close();
-      print('[LocalDbService] Closed bills box for user: $_currentUserId');
     }
     if (_settingsBox != null && _settingsBox!.isOpen) {
       await _settingsBox!.close();
-      print('[LocalDbService] Closed settings box for user: $_currentUserId');
     }
 
     _billsBox = null;
@@ -99,23 +88,14 @@ class LocalDbService {
     }
 
     if (newUserId == _currentUserId) {
-      print(
-        '[LocalDbService] ⏭️ Already on user: $newUserId, no switch needed',
-      );
       return;
     }
 
-    print('[LocalDbService] 🔄 === USER SWITCH START ===');
-    print('[LocalDbService] From: $_currentUserId');
-    print('[LocalDbService] To: $newUserId');
-
     // Close current user's boxes
     await _closeCurrentBoxes();
-    print('[LocalDbService] 🔒 Previous user boxes closed');
 
     // Open new user's boxes
     await _openUserBoxes(newUserId);
-    print('[LocalDbService] 🔄 === USER SWITCH COMPLETE ===');
   }
 
   /// Get bills box (throw if not initialized)
@@ -142,15 +122,7 @@ class LocalDbService {
 
   /// Get all bills
   List<Bill> getAllBills() {
-    final bills = billsBox.values.toList();
-    print('[LocalDbService] 📋 getAllBills called for user: $_currentUserId');
-    print('[LocalDbService] Found ${bills.length} bills in box');
-    if (bills.isNotEmpty && bills.length <= 5) {
-      for (final bill in bills) {
-        print('[LocalDbService]   - ${bill.name} (due: ${bill.dueDate})');
-      }
-    }
-    return bills;
+    return billsBox.values.toList();
   }
 
   /// Get a bill by ID

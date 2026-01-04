@@ -30,17 +30,22 @@ class AccountDeletionService {
   /// Delete the current user's account and all data permanently
   ///
   /// [onProgress] - Optional callback to report deletion progress
+  /// [onReauthRequired] - Callback invoked when re-authentication is needed.
+  ///   Should return true if re-authentication was successful.
   /// Returns true if deletion was successful, throws exception on error
   ///
   /// Deletion sequence:
   /// 1. Cancel all local notifications
   /// 2. Delete Firestore user document and subcollections
-  /// 3. Delete Firebase Authentication account
+  /// 3. Delete Firebase Authentication account (with auto re-auth if needed)
   /// 4. Clear all Hive boxes
   /// 5. Clear SharedPreferences
   ///
   /// If any step fails, the process stops and throws an exception
-  Future<void> deleteAccount({Function(String message)? onProgress}) async {
+  Future<void> deleteAccount({
+    Function(String message)? onProgress,
+    Future<bool> Function()? onReauthRequired,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw Exception('No user is currently signed in');
@@ -75,7 +80,7 @@ class AccountDeletionService {
       print(
         '[AccountDeletionService] Step 3/5: Deleting Firebase Auth account',
       );
-      await user.delete();
+      await _deleteFirebaseAuthAccount(user, onReauthRequired);
       print('[AccountDeletionService] ✅ Firebase Auth account deleted');
 
       // ========================================
@@ -101,6 +106,46 @@ class AccountDeletionService {
       print('[AccountDeletionService] ❌ Error during account deletion: $e');
       print('[AccountDeletionService] Stack trace: $stackTrace');
       rethrow;
+    }
+  }
+
+  /// Delete Firebase Auth account, handling re-authentication if required
+  Future<void> _deleteFirebaseAuthAccount(
+    User user,
+    Future<bool> Function()? onReauthRequired,
+  ) async {
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        print(
+          '[AccountDeletionService] 🔐 Re-authentication required, attempting...',
+        );
+
+        if (onReauthRequired == null) {
+          throw Exception(
+            'Re-authentication is required but no re-auth handler was provided',
+          );
+        }
+
+        // Call the re-authentication callback
+        final reauthSuccess = await onReauthRequired();
+        if (!reauthSuccess) {
+          throw Exception('Re-authentication was cancelled by user');
+        }
+
+        print('[AccountDeletionService] ✅ Re-authenticated, retrying delete');
+
+        // Retry deletion after successful re-authentication
+        // Get fresh user reference after re-auth
+        final freshUser = _auth.currentUser;
+        if (freshUser == null) {
+          throw Exception('User is no longer signed in after re-auth');
+        }
+        await freshUser.delete();
+      } else {
+        rethrow;
+      }
     }
   }
 

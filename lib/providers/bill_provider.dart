@@ -410,10 +410,14 @@ class BillProvider extends ChangeNotifier {
 
       _logDebug('🗑️ Starting account deletion...');
 
-      // Execute account deletion
+      // Execute account deletion with re-auth support
       await _accountDeletionService.deleteAccount(
         onProgress: (message) {
           _logDebug('  → $message');
+        },
+        onReauthRequired: () async {
+          _logDebug('🔐 Re-authentication required...');
+          return await _authService.reauthenticateWithGoogle();
         },
       );
 

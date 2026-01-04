@@ -41,6 +41,9 @@ dependencies:
   intl: ^0.19.0
   shared_preferences: ^2.2.2
 
+  # Native Splash Screen
+  flutter_native_splash: ^2.3.8
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -103,3 +106,16 @@ flutter_launcher_icons:
   macos:
     generate: true
     image_path: "assets/images/logo.png"
+
+# Native Splash Screen Configuration
+# Matches the Flutter splash screen design
+flutter_native_splash:
+  color: "#F8FAFC"  # AppColors.background (Slate 50)
+  image: assets/images/logo.png
+  color_dark: "#F8FAFC"  # Same for dark mode
+  image_dark: assets/images/logo.png
+  android_12:
+    color: "#F8FAFC"
+    image: assets/images/logo.png
+    color_dark: "#F8FAFC"
+    image_dark: assets/images/logo.png

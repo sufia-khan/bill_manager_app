@@ -38,21 +38,16 @@ class AuthService {
   /// [onAccountSelected] is called after the user selects an account but before Firebase auth.
   Future<User?> signInWithGoogle({Function? onAccountSelected}) async {
     try {
-      print('[AuthService] Starting Google Sign-In flow...');
-
       // Force account picker by signing out first (clears cached account)
       try {
         await _googleSignIn.signOut();
-      } catch (e) {
-        print('[AuthService] Sign-out error (safe to ignore): $e');
-      }
+      } catch (e) {}
 
       // Trigger the Google Sign-In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         // User cancelled the sign-in
-        print('[AuthService] User cancelled Google Sign-In');
         return null;
       }
 
@@ -61,16 +56,9 @@ class AuthService {
         onAccountSelected();
       }
 
-      print('[AuthService] Google account selected: ${googleUser.email}');
-      print('[AuthService] Getting authentication tokens...');
-
       // Get auth details from the request
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-
-      print(
-        '[AuthService] Got tokens - accessToken: ${googleAuth.accessToken != null}, idToken: ${googleAuth.idToken != null}',
-      );
 
       // Create a new credential
       final credential = GoogleAuthProvider.credential(
@@ -78,23 +66,58 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      print('[AuthService] Signing in to Firebase...');
-
       // Sign in to Firebase with the Google credential
       final UserCredential userCredential = await _auth.signInWithCredential(
         credential,
       );
 
-      print(
-        '[AuthService] Firebase sign-in successful! User: ${userCredential.user?.email}',
-      );
       return userCredential.user;
-    } on FirebaseAuthException catch (e) {
-      print('[AuthService] FirebaseAuthException: ${e.code} - ${e.message}');
+    } on FirebaseAuthException {
+      // FirebaseAuthException - rethrow to caller
       rethrow;
-    } catch (e, stackTrace) {
-      print('[AuthService] Error signing in with Google: $e');
-      print('[AuthService] Stack trace: $stackTrace');
+    } catch (_) {
+      // Error signing in with Google
+      rethrow;
+    }
+  }
+
+  /// Re-authenticate user with Google
+  /// Required before sensitive operations like account deletion
+  /// Returns true if re-authentication was successful
+  Future<bool> reauthenticateWithGoogle() async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        throw Exception('No user is currently signed in');
+      }
+
+      // Get fresh Google credentials
+      // First disconnect to ensure we get fresh credentials
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        // Ignore sign-out errors
+      }
+
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled
+        return false;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Re-authenticate with Firebase
+      await user.reauthenticateWithCredential(credential);
+      return true;
+    } catch (e) {
+      print('[AuthService] Re-authentication failed: $e');
       rethrow;
     }
   }
@@ -104,8 +127,8 @@ class AuthService {
     try {
       await _googleSignIn.signOut();
       await _auth.signOut();
-    } catch (e) {
-      print('Error signing out: $e');
+    } catch (_) {
+      // Error intentionally ignored - sign out should not throw
     }
   }
 
