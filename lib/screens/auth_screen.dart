@@ -74,18 +74,30 @@ class _AuthScreenState extends State<AuthScreen> {
             children: [
               const Spacer(flex: 2),
 
-              // Welcome illustration/icon - App Logo
-              Container(
-                width: 140,
-                height: 140,
-                decoration: const BoxDecoration(shape: BoxShape.circle),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(70),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    width: 140,
-                    height: 140,
-                    fit: BoxFit.cover,
+              // Welcome illustration/icon - App Logo with Hero animation
+              Hero(
+                tag: 'app-logo',
+                child: Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(32),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      width: 140,
+                      height: 140,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),

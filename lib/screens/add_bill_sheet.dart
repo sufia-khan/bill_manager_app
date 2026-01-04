@@ -161,36 +161,6 @@ class _AddBillSheetState extends State<AddBillSheet> {
     }
   }
 
-  /// Calculate and format the notification time for display
-  String _getNotificationTimePreview() {
-    final notifyAt = ReminderConfig.calculateNotificationTime(
-      dueDate: _selectedDate,
-      preference: _selectedReminder,
-      reminderHour: _selectedReminderTime.hour,
-      reminderMinute: _selectedReminderTime.minute,
-    );
-
-    if (notifyAt == null) {
-      if (_selectedReminder == ReminderPreference.none) {
-        return 'No notification scheduled';
-      }
-      return 'No reminder (bill is past due)';
-    }
-
-    final dateFormat = DateFormat('MMM d, yyyy');
-    final timeFormat = DateFormat('h:mm a');
-
-    return '${dateFormat.format(notifyAt)} at ${timeFormat.format(notifyAt)}';
-  }
-
-  /// Get the relative time description
-  String _getRelativeTimeDescription() {
-    return ReminderConfig.getNotificationTimeDescription(
-      dueDate: _selectedDate,
-      preference: _selectedReminder,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
@@ -226,46 +196,17 @@ class _AddBillSheetState extends State<AddBillSheet> {
                   ),
                 ),
 
-                // Title with Dev Mode indicator
+                // Title
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Add Bill',
-                          style: GoogleFonts.inter(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        // Show dev mode indicator (only in debug builds)
-                        if (kDebugMode) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.orange.withOpacity(0.5),
-                              ),
-                            ),
-                            child: Text(
-                              'DEV',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.orange,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      'Add Bill',
+                      style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     IconButton(
                       onPressed: widget.onClose,
@@ -511,81 +452,6 @@ class _AddBillSheetState extends State<AddBillSheet> {
                   ),
                 ],
 
-                // Notification Time Preview (visible for verification)
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.notifications_active_rounded,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Notification Preview',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _getNotificationTimePreview(),
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _getRelativeTimeDescription(),
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      // Dev mode timing explanation
-                      if (kDebugMode) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'DEV: Using accelerated timing for testing',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 24),
 
                 // Save Button

@@ -198,7 +198,15 @@ class _AppNavigatorState extends State<AppNavigator> {
       builder: (context, provider, _) {
         switch (_currentScreen) {
           case AppScreen.splash:
-            return SplashScreen(onComplete: () => _navigateTo(AppScreen.auth));
+            return SplashScreen(
+              onComplete: () {
+                if (provider.isSignedIn) {
+                  _navigateTo(AppScreen.home);
+                } else {
+                  _navigateTo(AppScreen.auth);
+                }
+              },
+            );
 
           case AppScreen.auth:
             return AuthScreen(

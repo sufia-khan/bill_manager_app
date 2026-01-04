@@ -112,56 +112,6 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 28),
 
-                      // Help & Support Section
-                      _buildSectionTitle('Help & Diagnostics'),
-                      const SizedBox(height: 12),
-                      _SettingsCard(
-                        children: [
-                          _SettingsTile(
-                            icon: Icons.bug_report_outlined,
-                            title: 'Test Notification',
-                            subtitle: 'Send an immediate test alert',
-                            onTap: () async {
-                              final provider = context.read<BillProvider>();
-                              await provider.notificationService
-                                  .showTestNotification();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Test notification sent!'),
-                                    backgroundColor: AppColors.primary,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          const Divider(height: 1),
-                          _SettingsTile(
-                            icon: Icons.timer_outlined,
-                            title: 'Test Scheduled (5s)',
-                            subtitle: 'Verifies the scheduling engine works',
-                            onTap: () async {
-                              final provider = context.read<BillProvider>();
-                              await provider.notificationService
-                                  .showScheduledTestNotification();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Scheduled! Wait 5 seconds...',
-                                    ),
-                                    backgroundColor: AppColors.primary,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-
                       // Sign Out Button (if signed in)
                       if (!isGuest) ...[
                         SizedBox(

@@ -510,9 +510,8 @@ class BillProvider extends ChangeNotifier {
       if (index != -1) {
         _bills[index] = updatedBill;
       }
-      // Persist to local DB and sync
-      await _localDb.updateBill(updatedBill);
-      _syncService.scheduleDebouncedSync();
+      // Persist to local DB WITHOUT marking as dirty for cloud sync
+      await _localDb.updateBillLocally(updatedBill);
       notifyListeners();
     }
   }
@@ -531,8 +530,7 @@ class BillProvider extends ChangeNotifier {
     } else {
       bill.notificationOneDayBeforeSent = true;
     }
-    await _localDb.updateBill(bill);
-    _syncService.scheduleDebouncedSync();
+    await _localDb.updateBillLocally(bill);
     notifyListeners();
   }
 }

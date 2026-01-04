@@ -211,6 +211,14 @@ class LocalDbService {
     return bill;
   }
 
+  /// Update an existing bill LOCALLY ONLY
+  /// Does NOT mark as updated/dirty, ensuring no cloud sync is triggered.
+  /// Used for volatile flags like notification sent status.
+  Future<Bill> updateBillLocally(Bill bill) async {
+    await billsBox.put(bill.id, bill);
+    return bill;
+  }
+
   /// Delete a bill
   Future<void> deleteBill(String id) async {
     await billsBox.delete(id);

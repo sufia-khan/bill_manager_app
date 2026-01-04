@@ -375,8 +375,7 @@ class Bill extends HiveObject {
       'lastModified': effectiveLastModified.toIso8601String(),
       'reminderTimeHour': reminderTimeHour,
       'reminderTimeMinute': reminderTimeMinute,
-      'notificationOneDayBeforeSent': notificationOneDayBeforeSent,
-      'notificationSameDaySent': notificationSameDaySent,
+      // Note: notification flags are kept local-only to reduce Firestore writes
     };
   }
 

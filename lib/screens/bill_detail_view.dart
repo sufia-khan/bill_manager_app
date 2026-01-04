@@ -33,71 +33,17 @@ class BillDetailView extends StatefulWidget {
 
 class _BillDetailViewState extends State<BillDetailView> {
   Timer? _countdownTimer;
-  Duration? _timeRemaining;
-  DateTime? _notificationTime; // Store the notification time once
 
   @override
   void initState() {
     super.initState();
     // Calculate RAW notification time once on init (without fallback)
-    if (widget.bill.reminderPreference != ReminderPreference.none) {
-      _notificationTime = ReminderConfig.calculateRawNotificationTime(
-        dueDate: widget.bill.dueDate,
-        preference: widget.bill.reminderPreference,
-        reminderHour: widget.bill.reminderTimeHour,
-        reminderMinute: widget.bill.reminderTimeMinute,
-        referenceTime: widget.bill.updatedAt,
-      );
-
-      // Check if already in past
-      final now = DateTime.now();
-      if (_notificationTime!.isBefore(now)) {
-        _timeRemaining = null; // Already passed, show "Notification sent"
-      }
-    }
-    _startCountdown();
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
     super.dispose();
-  }
-
-  void _startCountdown() {
-    _updateTimeRemaining();
-    _countdownTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _updateTimeRemaining(),
-    );
-  }
-
-  void _updateTimeRemaining() {
-    if (widget.bill.reminderPreference == ReminderPreference.none ||
-        _notificationTime == null) {
-      return;
-    }
-
-    final now = DateTime.now();
-    final remaining = _notificationTime!.difference(now);
-
-    if (mounted) {
-      setState(() {
-        _timeRemaining = remaining.isNegative ? null : remaining;
-      });
-    }
-  }
-
-  String _formatCountdown(Duration duration) {
-    if (duration.inDays > 0) {
-      return '${duration.inDays}d ${duration.inHours % 24}h';
-    } else if (duration.inHours > 0) {
-      return '${duration.inHours}h ${duration.inMinutes % 60}m';
-    } else if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}m ${duration.inSeconds % 60}s';
-    } else {
-      return '${duration.inSeconds}s';
-    }
   }
 
   @override
@@ -210,67 +156,7 @@ class _BillDetailViewState extends State<BillDetailView> {
                             label: 'Reminder',
                             value: widget.bill.reminderPreference.displayName,
                           ),
-                          // Show notification countdown when not paid and reminder is not None
-                          if (!widget.bill.paid &&
-                              widget.bill.reminderPreference !=
-                                  ReminderPreference.none) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.alarm_rounded,
-                                    size: 18,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          _timeRemaining == null
-                                              ? 'Notification sent'
-                                              : 'Notification in',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        if (_timeRemaining != null)
-                                          Text(
-                                            _formatCountdown(_timeRemaining!),
-                                            style: GoogleFonts.inter(
-                                              fontSize: 18,
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: -0.5,
-                                            ),
-                                          )
-                                        else
-                                          Text(
-                                            'Check your notifications',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 13,
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+
                           if (widget.bill.isSyncPending) ...[
                             const Divider(height: 24),
                             _DetailRow(
@@ -318,35 +204,6 @@ class _BillDetailViewState extends State<BillDetailView> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Edit Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: widget.onEdit,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          side: const BorderSide(color: AppColors.border),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.edit_rounded),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'Edit Bill',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 12),
 
                     // Delete Button
@@ -395,34 +252,6 @@ class _BillDetailViewState extends State<BillDetailView> {
             style: IconButton.styleFrom(foregroundColor: AppColors.textPrimary),
           ),
           const Spacer(),
-          // Sync indicator
-          if (widget.bill.isSynced)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.cloud_done_rounded,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Synced',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
