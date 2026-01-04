@@ -1,5 +1,5 @@
 name: bill_manager_app
-description: "BillEase - Never miss a bill payment again"
+description: "BillMinder - Never miss a bill payment again"
 publish_to: 'none'
 
 version: 1.0.0+1

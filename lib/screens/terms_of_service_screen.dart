@@ -29,7 +29,7 @@ class TermsOfServiceScreen extends StatelessWidget {
                   children: [
                     _buildSection(
                       '1. Acceptance of Terms',
-                      'By using this application ("App"), you agree to these Terms of Service. If you do not agree, do not use the App.',
+                      'By using BillMinder ("App"), you agree to these Terms of Service. If you do not agree, do not use the App.',
                     ),
                     _buildSection(
                       '2. Purpose of the App',

@@ -86,17 +86,20 @@ class _BillDetailViewState extends State<BillDetailView> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Amount - Large Typography
+                    // Amount - Large Typography with Orange Highlight
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.primary, AppColors.primaryDark],
+                        ),
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppColors.borderLight),
                         boxShadow: [
                           BoxShadow(
-                            color: _getStatusColor().withOpacity(0.1),
+                            color: AppColors.primary.withOpacity(0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -108,7 +111,7 @@ class _BillDetailViewState extends State<BillDetailView> {
                             'Amount',
                             style: GoogleFonts.inter(
                               fontSize: 14,
-                              color: AppColors.textSecondary,
+                              color: Colors.white.withOpacity(0.9),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -117,7 +120,7 @@ class _BillDetailViewState extends State<BillDetailView> {
                             style: GoogleFonts.inter(
                               fontSize: 48,
                               fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
+                              color: Colors.white,
                               letterSpacing: -2,
                             ),
                           ),
@@ -156,16 +159,6 @@ class _BillDetailViewState extends State<BillDetailView> {
                             label: 'Reminder',
                             value: widget.bill.reminderPreference.displayName,
                           ),
-
-                          if (widget.bill.isSyncPending) ...[
-                            const Divider(height: 24),
-                            _DetailRow(
-                              icon: Icons.cloud_off_rounded,
-                              label: 'Sync Status',
-                              value: 'Pending sync',
-                              valueColor: AppColors.pending,
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -178,7 +171,7 @@ class _BillDetailViewState extends State<BillDetailView> {
                         child: ElevatedButton(
                           onPressed: widget.onMarkPaid,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: AppColors.paid,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 18),
                             shape: RoundedRectangleBorder(
@@ -321,13 +314,11 @@ class _DetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color? valueColor;
 
   const _DetailRow({
     required this.icon,
     required this.label,
     required this.value,
-    this.valueColor,
   });
 
   @override
@@ -361,7 +352,7 @@ class _DetailRow extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: valueColor ?? AppColors.textPrimary,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
