@@ -267,7 +267,7 @@ class SmartSyncService {
         if (localBill == null) {
           // New bill from cloud
           await _localDb.upsertBills([remoteBill]);
-        } else if (remoteBill.version > localBill.version) {
+        } else if (remoteBill.billVersion > localBill.billVersion) {
           // Remote is newer
           await _localDb.upsertBills([remoteBill]);
         }

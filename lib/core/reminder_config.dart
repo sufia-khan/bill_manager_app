@@ -223,7 +223,7 @@ class ReminderConfig {
   ///
   /// Edge Case: If calculated time is in the past and [useFallback] is true,
   /// schedule 5 seconds from now.
-  static DateTime calculateNotificationTime({
+  static DateTime? calculateNotificationTime({
     required DateTime dueDate,
     required ReminderPreference preference,
     int? reminderHour,
@@ -255,10 +255,30 @@ class ReminderConfig {
     }
 
     // Edge case: If notifyAt is in the past, and it's for scheduling (useFallback=true),
-    // schedule 5 seconds from now.
+    // schedule 5 seconds from now ONLY if the due date itself is in the future
+    // AND the bill was actually updated AFTER the notification time (meaning it's a new/modified bill).
     if (useFallback && notifyAt.isBefore(now)) {
+      final today = DateTime(now.year, now.month, now.day);
+      final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+
+      if (due.isBefore(today)) {
+        _logDebug('❌ Bill is already overdue, skipping notification');
+        return null; // Return null to indicate no notification should be scheduled
+      }
+
+      // Special isolation logic: Only fallback to 5s if the bill was touched AFTER the notification time.
+      // This prevents notifications from re-firing on every app restart/login.
+      if (referenceTime != null && referenceTime.isBefore(notifyAt)) {
+        _logDebug(
+          '⏭️ Notification time ($notifyAt) is in past and bill was NOT updated after it. Skipping fallback.',
+        );
+        return null;
+      }
+
       notifyAt = now.add(const Duration(seconds: 5));
-      _logDebug('⚠️ Calculated time was in past, scheduling 5s from now');
+      _logDebug(
+        '⚠️ Calculated time was in past but bill is new/updated, scheduling 5s fallback',
+      );
     }
 
     _logDebug('📅 Due Date: $dueDate');
@@ -272,7 +292,7 @@ class ReminderConfig {
 
   /// Calculate the RAW notification time without fallback
   /// Deprecated: Use calculateNotificationTime with useFallback: false
-  static DateTime calculateRawNotificationTime({
+  static DateTime? calculateRawNotificationTime({
     required DateTime dueDate,
     required ReminderPreference preference,
     int? reminderHour,
@@ -297,6 +317,8 @@ class ReminderConfig {
     int? reminderMinute,
     DateTime? referenceTime,
   }) {
+    if (preference == ReminderPreference.none) return 'None';
+
     final notifyAt = calculateNotificationTime(
       dueDate: dueDate,
       preference: preference,
@@ -305,6 +327,10 @@ class ReminderConfig {
       referenceTime: referenceTime,
       useFallback: true,
     );
+
+    if (notifyAt == null) {
+      return 'No reminder (past due)';
+    }
 
     final now = DateTime.now();
     final difference = notifyAt.difference(now);

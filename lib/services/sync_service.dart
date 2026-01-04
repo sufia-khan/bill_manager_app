@@ -114,7 +114,9 @@ class SyncService {
         if (localBill == null) {
           // New bill from cloud
           await _localDb.upsertBills([remoteBill]);
-        } else if (remoteBill.updatedAt.isAfter(localBill.updatedAt)) {
+        } else if (remoteBill.effectiveUpdatedAt.isAfter(
+          localBill.effectiveUpdatedAt,
+        )) {
           // Remote is newer
           await _localDb.upsertBills([remoteBill]);
         }

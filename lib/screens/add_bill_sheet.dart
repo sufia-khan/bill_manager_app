@@ -170,6 +170,13 @@ class _AddBillSheetState extends State<AddBillSheet> {
       reminderMinute: _selectedReminderTime.minute,
     );
 
+    if (notifyAt == null) {
+      if (_selectedReminder == ReminderPreference.none) {
+        return 'No notification scheduled';
+      }
+      return 'No reminder (bill is past due)';
+    }
+
     final dateFormat = DateFormat('MMM d, yyyy');
     final timeFormat = DateFormat('h:mm a');
 

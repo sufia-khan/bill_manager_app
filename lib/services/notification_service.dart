@@ -167,16 +167,14 @@ class NotificationService {
   /// - sameDay: Single notification on due date
   ///
   /// Uses user's custom reminder time (hour:minute) for all notifications
-  Future<void> scheduleBillReminders(Bill bill) async {
+  /// Schedule reminders for a specific bill
+  /// Returns a Map indicating which notifications were triggered (true = scheduled/sent)
+  Future<Map<String, bool>> scheduleBillReminders(Bill bill) async {
     print('[NotificationService] 📅 === SCHEDULING BILL REMINDER ===');
     print('[NotificationService] Bill: "${bill.name}"');
-    print('[NotificationService] Due Date: ${bill.dueDate}');
-    print(
-      '[NotificationService] Reminder Preference: ${bill.reminderPreference.displayName}',
-    );
-    print(
-      '[NotificationService] Reminder Time: ${bill.reminderTimeHour}:${bill.reminderTimeMinute.toString().padLeft(2, '0')}',
-    );
+    print('[NotificationService] ID: ${bill.id}');
+
+    final Map<String, bool> results = {'oneDayBefore': false, 'sameDay': false};
 
     if (!_isInitialized) {
       print('[NotificationService] ⚠️ Not initialized, initializing...');
@@ -186,7 +184,7 @@ class NotificationService {
     // Don't schedule for paid bills
     if (bill.paid) {
       print('[NotificationService] ⏭️ Bill is paid, skipping notification');
-      return;
+      return results;
     }
 
     // Don't schedule if preference is 'none'
@@ -194,7 +192,7 @@ class NotificationService {
       print(
         '[NotificationService] 🔕 Preference is NONE, skipping notifications',
       );
-      return;
+      return results;
     }
 
     final now = DateTime.now();
@@ -214,47 +212,75 @@ class NotificationService {
 
     // Schedule "one day before" notification
     if (scheduleOneDayBefore) {
-      final notificationTime = _calculateNotificationTime(
-        bill,
-        oneDayBefore: true,
-      );
-
-      if (notificationTime != null) {
-        await _scheduleNotification(
-          bill: bill,
-          notificationId: bill.id.hashCode.abs() % 100000,
-          notificationTime: notificationTime,
-          title: 'Bill Due Tomorrow',
-          body: '${bill.name} - ${bill.formattedAmount} is due tomorrow',
-        );
-        scheduledCount++;
-      } else {
+      if (bill.isNotificationOneDayBeforeSent) {
         print(
-          '[NotificationService] ⏭️ One day before notification time is in past, skipping',
+          '[NotificationService] ⏭️ One day before notification already sent, skipping',
         );
+      } else {
+        final notificationTime = _calculateNotificationTime(
+          bill,
+          oneDayBefore: true,
+        );
+
+        if (notificationTime != null) {
+          final isFallback = notificationTime.difference(now).inSeconds <= 6;
+
+          await _scheduleNotification(
+            bill: bill,
+            notificationId: bill.id.hashCode.abs() % 100000,
+            notificationTime: notificationTime,
+            title: 'Bill Due Tomorrow',
+            body: '${bill.name} - ${bill.formattedAmount} is due tomorrow',
+          );
+          scheduledCount++;
+          if (isFallback) {
+            results['oneDayBefore'] = true;
+          } else if (notificationTime.isBefore(now)) {
+            // It was in the past and no fallback was triggered
+            results['oneDayBefore'] = true;
+          }
+        } else {
+          print(
+            '[NotificationService] ⏭️ One day before notification time skipped (overdue or preference logic)',
+          );
+        }
       }
     }
 
     // Schedule "same day" notification
     if (scheduleSameDay) {
-      final notificationTime = _calculateNotificationTime(
-        bill,
-        oneDayBefore: false,
-      );
-
-      if (notificationTime != null) {
-        await _scheduleNotification(
-          bill: bill,
-          notificationId: (bill.id.hashCode.abs() % 100000) + 1,
-          notificationTime: notificationTime,
-          title: 'Bill Due Today',
-          body: '${bill.name} - ${bill.formattedAmount} is due today!',
-        );
-        scheduledCount++;
-      } else {
+      if (bill.isNotificationSameDaySent) {
         print(
-          '[NotificationService] ⏭️ Same day notification time is in past, skipping',
+          '[NotificationService] ⏭️ Same day notification already sent, skipping',
         );
+      } else {
+        final notificationTime = _calculateNotificationTime(
+          bill,
+          oneDayBefore: false,
+        );
+
+        if (notificationTime != null) {
+          final isFallback = notificationTime.difference(now).inSeconds <= 6;
+
+          await _scheduleNotification(
+            bill: bill,
+            notificationId: (bill.id.hashCode.abs() % 100000) + 1,
+            notificationTime: notificationTime,
+            title: 'Bill Due Today',
+            body: '${bill.name} - ${bill.formattedAmount} is due today!',
+          );
+          scheduledCount++;
+          if (isFallback) {
+            results['sameDay'] = true;
+          } else if (notificationTime.isBefore(now)) {
+            // It was in the past and no fallback was triggered
+            results['sameDay'] = true;
+          }
+        } else {
+          print(
+            '[NotificationService] ⏭️ Same day notification time skipped (overdue or preference logic)',
+          );
+        }
       }
     }
 
@@ -262,6 +288,7 @@ class NotificationService {
       '[NotificationService] ✅ Scheduled $scheduledCount notification(s) for "${bill.name}"',
     );
     print('[NotificationService] === SCHEDULING COMPLETE ===');
+    return results;
   }
 
   /// Calculate notification time based on due date, reminder time, and whether it's one day before
@@ -296,8 +323,8 @@ class NotificationService {
       'bill_reminders',
       'Bill Reminders',
       channelDescription: 'Reminders for upcoming bill due dates',
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       icon: '@mipmap/ic_launcher',
     );
 
@@ -316,6 +343,7 @@ class NotificationService {
       final tzDateTime = tz.TZDateTime.from(notificationTime, tz.local);
       print('[NotificationService] 🕒 Scheduling for: $tzDateTime');
       print('[NotificationService] 💡 Timezone Location: ${tz.local.name}');
+      print('[NotificationService] 📅 Original DateTime: $notificationTime');
 
       await _notifications.zonedSchedule(
         notificationId,
@@ -329,9 +357,16 @@ class NotificationService {
         payload: bill.id,
       );
 
-      print('[NotificationService] ✅ Scheduled: "$title" at $tzDateTime');
+      print(
+        '[NotificationService] ✅ Successfully scheduled: "$title" at $tzDateTime',
+      );
     } catch (e) {
       print('[NotificationService] ❌ ERROR scheduling notification: $e');
+      if (e.toString().contains('exact_alarms_not_permitted')) {
+        print(
+          '[NotificationService] 💡 TIP: Exact alarm permission missing in Settings!',
+        );
+      }
       rethrow;
     }
   }
@@ -408,5 +443,62 @@ class NotificationService {
     }
 
     print('[NotificationService] 🧪 === TEST NOTIFICATION END ===');
+  }
+
+  /// Show a scheduled test notification (fires in 5 seconds)
+  /// This tests the zonedSchedule API specifically.
+  Future<void> showScheduledTestNotification() async {
+    print('[NotificationService] 🧪 === SCHEDULED TEST START (5s) ===');
+
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    const androidDetails = AndroidNotificationDetails(
+      'test_channel',
+      'Test Notifications',
+      channelDescription: 'Test notifications for debugging',
+      importance: Importance.max,
+      priority: Priority.max,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    final scheduledTime = DateTime.now().add(const Duration(seconds: 5));
+    final tzTime = tz.TZDateTime.from(scheduledTime, tz.local);
+
+    print('[NotificationService] 🕒 Current system time: ${DateTime.now()}');
+    print('[NotificationService] 🕒 Scheduled time (local): $scheduledTime');
+    print('[NotificationService] 🕒 Scheduled time (tz): $tzTime');
+    print('[NotificationService] 💡 Using location: ${tz.local.name}');
+
+    try {
+      await _notifications.zonedSchedule(
+        999, // Unique test ID
+        'Scheduled Test 🎉',
+        'If you see this, the scheduling engine is working! (5s delay)',
+        tzTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      print(
+        '[NotificationService] ✅ Scheduled test notification successfully!',
+      );
+    } catch (e) {
+      print('[NotificationService] ❌ ERROR scheduling test notification: $e');
+      rethrow;
+    }
+
+    print('[NotificationService] 🧪 === SCHEDULED TEST END ===');
   }
 }

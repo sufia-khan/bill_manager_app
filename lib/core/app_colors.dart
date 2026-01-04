@@ -37,7 +37,7 @@ class AppColors {
 
   // Status colors
   static const Color pending = Color(0xFFF59E0B); // Amber 500
-  static const Color paid = Color(0xFFF97316); // Professional Orange 500
+  static const Color paid = Color(0xFF10B981); // Emerald Green 500
   static const Color overdue = Color(0xFFF43F5E); // Rose 500
 
   // Shadow colors

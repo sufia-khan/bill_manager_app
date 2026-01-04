@@ -117,11 +117,19 @@ class BillProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Clear any leftover notifications before loading new user's data
+      // This ensures strict user isolation
+      await _notificationService.cancelAllNotifications();
+      print('[BillProvider] 🗑️ Cleared previous notifications for isolation');
+
       _bills = _localDb.getAllBills();
       print('[BillProvider] ✅ Loaded ${_bills.length} bills');
 
-      // Schedule notifications for all unpaid bills
-      await _notificationService.rescheduleAllReminders(_bills);
+      // Process notifications for all bills individually to ensure sent flags are persisted
+      // and duplicates are not re-sent based on the new ReminderConfig logic.
+      for (final bill in _bills) {
+        await _rescheduleRemindersForBill(bill);
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -171,12 +179,7 @@ class BillProvider extends ChangeNotifier {
       notifyListeners();
 
       // Schedule notifications
-      final notificationInfo = await _notificationService.scheduleBillReminder(
-        bill,
-      );
-      _logDebug(
-        '📅 Scheduled notification: ${notificationInfo.timeDescription}',
-      );
+      await _rescheduleRemindersForBill(bill);
 
       // Schedule debounced sync
       _syncService.scheduleDebouncedSync();
@@ -192,12 +195,15 @@ class BillProvider extends ChangeNotifier {
   /// Update an existing bill
   Future<bool> updateBill(Bill bill) async {
     try {
+      // Reset notification flags because the bill was manually modified
+      bill.resetNotificationFlags();
+
       await _localDb.updateBill(bill);
       _bills = _localDb.getAllBills();
       notifyListeners();
 
       // Reschedule notifications
-      await _notificationService.scheduleBillReminders(bill);
+      await _rescheduleRemindersForBill(bill);
 
       // Schedule debounced sync
       _syncService.scheduleDebouncedSync();
@@ -289,6 +295,10 @@ class BillProvider extends ChangeNotifier {
         // Set user ID in notification service
         _notificationService.setUserId(user.uid);
 
+        // Clear all existing notifications to ensure isolation for the new user
+        await _notificationService.cancelAllNotifications();
+        _logDebug('🗑️ Cleared notifications for user isolation');
+
         // Set up sync with user ID
         _syncService.setUserId(user.uid);
 
@@ -299,8 +309,10 @@ class BillProvider extends ChangeNotifier {
         // Reload bills from user's storage
         _bills = _localDb.getAllBills();
 
-        // Schedule notifications for user's bills
-        await _notificationService.rescheduleAllReminders(_bills);
+        // Schedule notifications for user's bills and persist status
+        for (final bill in _bills) {
+          await _rescheduleRemindersForBill(bill);
+        }
 
         _isLoading = false;
         notifyListeners();
@@ -466,5 +478,61 @@ class BillProvider extends ChangeNotifier {
     if (kDebugMode) {
       debugPrint('[BillProvider] $message');
     }
+  }
+
+  /// Internal helper to reschedule reminders and track sent status
+  Future<void> _rescheduleRemindersForBill(Bill bill) async {
+    if (bill.isDeleted) return;
+
+    final results = await _notificationService.scheduleBillReminders(bill);
+
+    // If any notifications were triggered (sent via fallback), mark them as sent in the DB
+    bool needsUpdate = false;
+    final updatedBill = bill.copyWith();
+
+    if (results['oneDayBefore'] == true &&
+        !bill.isNotificationOneDayBeforeSent) {
+      updatedBill.notificationOneDayBeforeSent = true;
+      needsUpdate = true;
+    }
+
+    if (results['sameDay'] == true && !bill.isNotificationSameDaySent) {
+      updatedBill.notificationSameDaySent = true;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      _logDebug(
+        '🔔 Marking notifications as sent for "${bill.name}" (${updatedBill.isNotificationOneDayBeforeSent}, ${updatedBill.isNotificationSameDaySent})',
+      );
+      // Update locally first
+      final index = _bills.indexWhere((b) => b.id == bill.id);
+      if (index != -1) {
+        _bills[index] = updatedBill;
+      }
+      // Persist to local DB and sync
+      await _localDb.updateBill(updatedBill);
+      _syncService.scheduleDebouncedSync();
+      notifyListeners();
+    }
+  }
+
+  /// Mark a notification as sent (called externally if needed)
+  Future<void> markNotificationAsSent(
+    String billId, {
+    required bool isSameDay,
+  }) async {
+    final index = _bills.indexWhere((b) => b.id == billId);
+    if (index == -1) return;
+
+    final bill = _bills[index];
+    if (isSameDay) {
+      bill.notificationSameDaySent = true;
+    } else {
+      bill.notificationOneDayBeforeSent = true;
+    }
+    await _localDb.updateBill(bill);
+    _syncService.scheduleDebouncedSync();
+    notifyListeners();
   }
 }

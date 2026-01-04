@@ -66,46 +66,55 @@ class Bill extends HiveObject {
   /// Dirty flag sync status: clean | created | updated | deleted
   /// Used to track which bills need cloud sync
   @HiveField(6)
-  String syncStatusValue;
+  String? syncStatusValue;
 
   /// Last update timestamp (for conflict resolution during sync)
   /// This is the user-facing "when was bill modified" timestamp
   @HiveField(7)
-  DateTime updatedAt;
+  DateTime? updatedAt;
 
   /// Reminder preference: 'one_day_before' or 'same_day'
   /// Determines when notification should be triggered
   @HiveField(8)
-  String reminderPreferenceValue;
+  String? reminderPreferenceValue;
 
   ///Currency code for this bill (ISO 4217)
   /// Allows each bill to have its own currency
   @HiveField(9)
-  String currencyCode;
+  String? currencyCode;
 
   /// Version number for optimistic locking and conflict detection
   /// Incremented on every local change
   @HiveField(10)
-  int version;
+  int? version;
 
   /// Last modified timestamp (for incremental cloud pulls)
   /// Updated only on actual data changes, used for lastSyncTime comparisons
   @HiveField(11)
-  DateTime lastModified;
+  DateTime? lastModified;
 
   /// Reminder time hour in 24-hour format (0-23)
   /// User's preferred time to receive notifications
   @HiveField(12)
-  int reminderTimeHour;
+  int? reminderTimeHour;
 
   /// Reminder time minute (0-59)
   @HiveField(13)
-  int reminderTimeMinute;
+  int? reminderTimeMinute;
+
+  /// Whether the "one day before" notification has been sent for this bill version
+  @HiveField(14)
+  bool? notificationOneDayBeforeSent;
+
+  /// Whether the "same day" notification has been sent for this bill version
+  @HiveField(15)
+  bool? notificationSameDaySent;
 
   // ==================== COMPUTED PROPERTIES ====================
 
   /// Get sync status as enum
-  BillSyncStatus get syncStatus => BillSyncStatus.fromString(syncStatusValue);
+  BillSyncStatus get syncStatus =>
+      BillSyncStatus.fromString(syncStatusValue ?? 'created');
 
   /// Set sync status from enum
   set syncStatus(BillSyncStatus status) {
@@ -114,24 +123,52 @@ class Bill extends HiveObject {
 
   /// Get the reminder preference as enum
   ReminderPreference get reminderPreference =>
-      ReminderPreferenceExtension.fromStorageValue(reminderPreferenceValue);
+      ReminderPreferenceExtension.fromStorageValue(
+        reminderPreferenceValue ?? 'none',
+      );
 
   /// Set the reminder preference from enum
   set reminderPreference(ReminderPreference value) {
     reminderPreferenceValue = value.storageValue;
   }
 
+  /// Get non-nullable version
+  int get billVersion => version ?? 1;
+
+  /// Get non-nullable updatedAt
+  DateTime get effectiveUpdatedAt => updatedAt ?? DateTime.now();
+
+  /// Get non-nullable lastModified
+  DateTime get effectiveLastModified =>
+      lastModified ?? updatedAt ?? DateTime.now();
+
+  /// Get the effective reminder time hour
+  int get effectiveReminderTimeHour => reminderTimeHour ?? 9;
+
+  /// Get the effective reminder time minute
+  int get effectiveReminderTimeMinute => reminderTimeMinute ?? 0;
+
+  /// Get non-nullable notificationOneDayBeforeSent
+  bool get isNotificationOneDayBeforeSent =>
+      notificationOneDayBeforeSent ?? false;
+
+  /// Get non-nullable notificationSameDaySent
+  bool get isNotificationSameDaySent => notificationSameDaySent ?? false;
+
   /// Get the reminder time as TimeOfDay
-  TimeOfDay get reminderTime =>
-      TimeOfDay(hour: reminderTimeHour, minute: reminderTimeMinute);
+  TimeOfDay get reminderTime => TimeOfDay(
+    hour: effectiveReminderTimeHour,
+    minute: effectiveReminderTimeMinute,
+  );
 
   /// Get the calculated notification time for this bill
-  DateTime get notificationTime => ReminderConfig.calculateNotificationTime(
+  /// Returns null if bill is overdue or notifications should be skipped
+  DateTime? get notificationTime => ReminderConfig.calculateNotificationTime(
     dueDate: dueDate,
     preference: reminderPreference,
-    reminderHour: reminderTimeHour,
-    reminderMinute: reminderTimeMinute,
-    referenceTime: updatedAt,
+    reminderHour: effectiveReminderTimeHour,
+    reminderMinute: effectiveReminderTimeMinute,
+    referenceTime: effectiveUpdatedAt,
   );
 
   /// Get human-readable description of notification timing
@@ -139,13 +176,13 @@ class Bill extends HiveObject {
       ReminderConfig.getNotificationTimeDescription(
         dueDate: dueDate,
         preference: reminderPreference,
-        reminderHour: reminderTimeHour,
-        reminderMinute: reminderTimeMinute,
-        referenceTime: updatedAt,
+        reminderHour: effectiveReminderTimeHour,
+        reminderMinute: effectiveReminderTimeMinute,
+        referenceTime: effectiveUpdatedAt,
       );
 
   /// Get the Currency object for this bill
-  Currency get currency => CurrencyData.fromCode(currencyCode);
+  Currency get currency => CurrencyData.fromCode(currencyCode ?? 'INR');
 
   /// Get the currency symbol for this bill
   String get currencySymbol => currency.safeSymbol;
@@ -161,16 +198,26 @@ class Bill extends HiveObject {
     required this.dueDate,
     this.repeat = 'one-time',
     this.paid = false,
-    this.syncStatusValue = 'created',
-    this.reminderPreferenceValue = 'none', // Default: no notifications
-    this.currencyCode = 'INR',
-    this.version = 1,
-    this.reminderTimeHour = 9, // Default: 9 AM
-    this.reminderTimeMinute = 0,
+    String? syncStatusValue,
+    String? reminderPreferenceValue,
+    String? currencyCode,
+    int? version,
+    int? reminderTimeHour,
+    int? reminderTimeMinute,
+    bool? notificationOneDayBeforeSent,
+    bool? notificationSameDaySent,
     DateTime? updatedAt,
     DateTime? lastModified,
-  }) : updatedAt = updatedAt ?? DateTime.now(),
-       lastModified = lastModified ?? DateTime.now();
+  }) : syncStatusValue = syncStatusValue ?? 'created',
+       reminderPreferenceValue = reminderPreferenceValue ?? 'none',
+       currencyCode = currencyCode ?? 'INR',
+       version = version ?? 1,
+       reminderTimeHour = reminderTimeHour ?? 9,
+       reminderTimeMinute = reminderTimeMinute ?? 0,
+       notificationOneDayBeforeSent = notificationOneDayBeforeSent ?? false,
+       notificationSameDaySent = notificationSameDaySent ?? false,
+       updatedAt = updatedAt ?? DateTime.now(),
+       lastModified = lastModified ?? updatedAt ?? DateTime.now();
 
   /// Get the bill status based on due date and paid state
   BillStatus get status {
@@ -210,7 +257,7 @@ class Bill extends HiveObject {
   /// Mark bill as created (new bill awaiting first upload)
   void markAsCreated() {
     syncStatus = BillSyncStatus.created;
-    version++;
+    version = (version ?? 1) + 1;
     lastModified = DateTime.now();
     updatedAt = DateTime.now();
   }
@@ -221,15 +268,21 @@ class Bill extends HiveObject {
     if (syncStatus != BillSyncStatus.created) {
       syncStatus = BillSyncStatus.updated;
     }
-    version++;
+    version = (version ?? 1) + 1;
     lastModified = DateTime.now();
     updatedAt = DateTime.now();
+  }
+
+  /// Reset notification sent flags (used when bill is modified or moved to next month)
+  void resetNotificationFlags() {
+    notificationOneDayBeforeSent = false;
+    notificationSameDaySent = false;
   }
 
   /// Mark bill as deleted (awaiting cloud deletion)
   void markAsDeleted() {
     syncStatus = BillSyncStatus.deleted;
-    version++;
+    version = (version ?? 1) + 1;
     lastModified = DateTime.now();
     updatedAt = DateTime.now();
   }
@@ -243,7 +296,7 @@ class Bill extends HiveObject {
 
   /// Increment version (for manual conflict resolution)
   void incrementVersion() {
-    version++;
+    version = (version ?? 1) + 1;
     lastModified = DateTime.now();
   }
 
@@ -279,6 +332,8 @@ class Bill extends HiveObject {
     DateTime? lastModified,
     int? reminderTimeHour,
     int? reminderTimeMinute,
+    bool? notificationOneDayBeforeSent,
+    bool? notificationSameDaySent,
   }) {
     return Bill(
       id: id ?? this.id,
@@ -296,6 +351,10 @@ class Bill extends HiveObject {
       lastModified: lastModified ?? this.lastModified,
       reminderTimeHour: reminderTimeHour ?? this.reminderTimeHour,
       reminderTimeMinute: reminderTimeMinute ?? this.reminderTimeMinute,
+      notificationOneDayBeforeSent:
+          notificationOneDayBeforeSent ?? this.notificationOneDayBeforeSent,
+      notificationSameDaySent:
+          notificationSameDaySent ?? this.notificationSameDaySent,
     );
   }
 
@@ -312,10 +371,12 @@ class Bill extends HiveObject {
       'reminderPreference': reminderPreferenceValue,
       'currencyCode': currencyCode,
       'version': version,
-      'updatedAt': updatedAt.toIso8601String(),
-      'lastModified': lastModified.toIso8601String(),
+      'updatedAt': effectiveUpdatedAt.toIso8601String(),
+      'lastModified': effectiveLastModified.toIso8601String(),
       'reminderTimeHour': reminderTimeHour,
       'reminderTimeMinute': reminderTimeMinute,
+      'notificationOneDayBeforeSent': notificationOneDayBeforeSent,
+      'notificationSameDaySent': notificationSameDaySent,
     };
   }
 
@@ -333,12 +394,20 @@ class Bill extends HiveObject {
           data['reminderPreference'] as String? ?? 'one_day_before',
       currencyCode: data['currencyCode'] as String? ?? 'INR',
       version: data['version'] as int? ?? 1,
-      updatedAt: DateTime.parse(data['updatedAt'] as String),
+      updatedAt: data['updatedAt'] != null
+          ? DateTime.parse(data['updatedAt'] as String)
+          : DateTime.now(),
       lastModified: data['lastModified'] != null
           ? DateTime.parse(data['lastModified'] as String)
-          : DateTime.parse(data['updatedAt'] as String),
+          : (data['updatedAt'] != null
+                ? DateTime.parse(data['updatedAt'] as String)
+                : DateTime.now()),
       reminderTimeHour: data['reminderTimeHour'] as int? ?? 9, // Default 9 AM
       reminderTimeMinute: data['reminderTimeMinute'] as int? ?? 0,
+      notificationOneDayBeforeSent:
+          data['notificationOneDayBeforeSent'] as bool? ?? false,
+      notificationSameDaySent:
+          data['notificationSameDaySent'] as bool? ?? false,
     );
   }
 

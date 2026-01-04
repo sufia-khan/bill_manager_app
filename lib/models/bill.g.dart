@@ -23,13 +23,14 @@ class BillAdapter extends TypeAdapter<Bill> {
       dueDate: fields[3] as DateTime,
       repeat: fields[4] as String,
       paid: fields[5] as bool,
-      syncStatusValue: fields[6] as String,
-      reminderPreferenceValue: fields[8] as String,
-      currencyCode: fields[9] as String,
-      version: fields[10] as int,
-      reminderTimeHour: fields[12] as int? ?? 9, // Default 9 AM for old data
-      reminderTimeMinute:
-          fields[13] as int? ?? 0, // Default 0 minutes for old data
+      syncStatusValue: fields[6] as String?,
+      reminderPreferenceValue: fields[8] as String?,
+      currencyCode: fields[9] as String?,
+      version: fields[10] as int?,
+      reminderTimeHour: fields[12] as int?,
+      reminderTimeMinute: fields[13] as int?,
+      notificationOneDayBeforeSent: fields[14] as bool?,
+      notificationSameDaySent: fields[15] as bool?,
       updatedAt: fields[7] as DateTime?,
       lastModified: fields[11] as DateTime?,
     );
@@ -38,7 +39,7 @@ class BillAdapter extends TypeAdapter<Bill> {
   @override
   void write(BinaryWriter writer, Bill obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -66,7 +67,11 @@ class BillAdapter extends TypeAdapter<Bill> {
       ..writeByte(12)
       ..write(obj.reminderTimeHour)
       ..writeByte(13)
-      ..write(obj.reminderTimeMinute);
+      ..write(obj.reminderTimeMinute)
+      ..writeByte(14)
+      ..write(obj.notificationOneDayBeforeSent)
+      ..writeByte(15)
+      ..write(obj.notificationSameDaySent);
   }
 
   @override
