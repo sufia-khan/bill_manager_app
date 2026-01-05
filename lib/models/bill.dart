@@ -7,7 +7,7 @@ import '../models/currency.dart';
 part 'bill.g.dart';
 
 /// Bill status enum for UI display
-enum BillStatus { upcoming, overdue, paid }
+enum BillStatus { upcoming, overdue, paid, dueToday }
 
 /// Sync status for production offline-first architecture with dirty flags
 /// - clean: No pending changes, in sync with cloud
@@ -228,6 +228,7 @@ class Bill extends HiveObject {
     final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
 
     if (due.isBefore(today)) return BillStatus.overdue;
+    if (due.isAtSameMomentAs(today)) return BillStatus.dueToday;
     return BillStatus.upcoming;
   }
 

@@ -71,10 +71,6 @@ class _BillDetailViewState extends State<BillDetailView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Status Badge
-                    _buildStatusBadge(),
-                    const SizedBox(height: 24),
-
                     // Bill Name
                     Text(
                       widget.bill.name,
@@ -89,40 +85,54 @@ class _BillDetailViewState extends State<BillDetailView> {
                     // Amount - Large Typography with Orange Highlight
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(28),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [AppColors.primary, AppColors.primaryDark],
                         ),
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: Column(
+                      child: Stack(
                         children: [
-                          Text(
-                            'Amount',
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Colors.white.withOpacity(0.9),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 20,
+                              horizontal: 24,
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Amount',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.white.withOpacity(0.9),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  currencyFormat.format(widget.bill.amount),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: -1,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            currencyFormat.format(widget.bill.amount),
-                            style: GoogleFonts.inter(
-                              fontSize: 48,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -2,
-                            ),
+                          Positioned(
+                            right: 12,
+                            bottom: 12,
+                            child: _buildStatusBadge(onPrimary: true),
                           ),
                         ],
                       ),
@@ -157,7 +167,11 @@ class _BillDetailViewState extends State<BillDetailView> {
                           _DetailRow(
                             icon: Icons.notifications_active_rounded,
                             label: 'Reminder',
-                            value: widget.bill.reminderPreference.displayName,
+                            value:
+                                widget.bill.reminderPreference ==
+                                    ReminderPreference.none
+                                ? 'None'
+                                : '${widget.bill.reminderPreference.displayName} at ${widget.bill.reminderTime.format(context)}',
                           ),
                         ],
                       ),
@@ -250,24 +264,32 @@ class _BillDetailViewState extends State<BillDetailView> {
     );
   }
 
-  Widget _buildStatusBadge() {
+  Widget _buildStatusBadge({bool onPrimary = false}) {
+    final color = onPrimary ? Colors.white : _getStatusColor();
+    final bgColor = onPrimary
+        ? Colors.white.withOpacity(0.2)
+        : _getStatusColor().withOpacity(0.1);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _getStatusColor().withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: onPrimary
+            ? Border.all(color: Colors.white.withOpacity(0.3))
+            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_getStatusIcon(), size: 18, color: _getStatusColor()),
-          const SizedBox(width: 6),
+          Icon(_getStatusIcon(), size: 14, color: color),
+          const SizedBox(width: 4),
           Text(
             _getStatusLabel(),
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: _getStatusColor(),
+              color: color,
             ),
           ),
         ],
@@ -281,6 +303,8 @@ class _BillDetailViewState extends State<BillDetailView> {
         return AppColors.paid;
       case BillStatus.overdue:
         return AppColors.overdue;
+      case BillStatus.dueToday:
+        return AppColors.dueToday;
       case BillStatus.upcoming:
         return AppColors.pending;
     }
@@ -292,6 +316,8 @@ class _BillDetailViewState extends State<BillDetailView> {
         return Icons.check_circle_rounded;
       case BillStatus.overdue:
         return Icons.warning_rounded;
+      case BillStatus.dueToday:
+        return Icons.event_available_rounded;
       case BillStatus.upcoming:
         return Icons.schedule_rounded;
     }
@@ -303,6 +329,8 @@ class _BillDetailViewState extends State<BillDetailView> {
         return 'Paid';
       case BillStatus.overdue:
         return 'Overdue';
+      case BillStatus.dueToday:
+        return 'Due Today';
       case BillStatus.upcoming:
         return 'Upcoming';
     }

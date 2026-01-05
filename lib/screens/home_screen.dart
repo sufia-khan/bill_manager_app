@@ -434,6 +434,8 @@ class _BillCard extends StatelessWidget {
         return AppColors.paid;
       case BillStatus.overdue:
         return AppColors.overdue;
+      case BillStatus.dueToday:
+        return AppColors.dueToday;
       case BillStatus.upcoming:
         return AppColors.pending;
     }
@@ -445,6 +447,8 @@ class _BillCard extends StatelessWidget {
         return Icons.check_circle_rounded;
       case BillStatus.overdue:
         return Icons.warning_rounded;
+      case BillStatus.dueToday:
+        return Icons.event_available_rounded;
       case BillStatus.upcoming:
         return Icons.schedule_rounded;
     }
@@ -482,6 +486,8 @@ class _StatusBadge extends StatelessWidget {
         return AppColors.paid;
       case BillStatus.overdue:
         return AppColors.overdue;
+      case BillStatus.dueToday:
+        return AppColors.dueToday;
       case BillStatus.upcoming:
         return AppColors.pending;
     }
@@ -493,6 +499,8 @@ class _StatusBadge extends StatelessWidget {
         return 'Paid';
       case BillStatus.overdue:
         return 'Overdue';
+      case BillStatus.dueToday:
+        return 'Due Today';
       case BillStatus.upcoming:
         return 'Upcoming';
     }

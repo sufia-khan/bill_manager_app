@@ -19,6 +19,8 @@ import 'screens/home_screen.dart';
 import 'screens/bill_detail_view.dart';
 import 'screens/add_bill_sheet.dart';
 import 'screens/settings_screen.dart';
+import 'core/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// BillMinder - Bill Manager App
 ///
@@ -64,7 +66,7 @@ void main() async {
   await notificationService.initialize();
 
   // Initialize settings provider
-  final settingsProvider = SettingsProvider();
+  final settingsProvider = SettingsProvider(notificationService);
   await settingsProvider.initialize();
 
   // If user is already signed in, initialize their data
@@ -261,20 +263,80 @@ class _AppNavigatorState extends State<AppNavigator> {
               bill: freshBill,
               onBack: () => _navigateTo(AppScreen.home),
               onMarkPaid: () async {
-                await provider.markBillPaid(freshBill.id);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        freshBill.isMonthly
-                            ? 'Marked paid! Next month\'s bill created.'
-                            : 'Bill marked as paid!',
-                      ),
-                      backgroundColor: const Color(0xFF10B981),
-                      behavior: SnackBarBehavior.floating,
+                // Show confirmation dialog
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  );
-                  _navigateTo(AppScreen.home);
+                    icon: const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.paid,
+                      size: 40,
+                    ),
+                    title: Text(
+                      'Mark as Paid?',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
+                    content: Text(
+                      'Have you already paid "${freshBill.name}"?',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(color: AppColors.textSecondary),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(
+                          'Not yet',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.paid,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Yes, Mark Paid',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                    actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  ),
+                );
+
+                if (confirm == true && mounted) {
+                  await provider.markBillPaid(freshBill.id);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          freshBill.isMonthly
+                              ? 'Marked paid! Next month\'s bill created.'
+                              : 'Bill marked as paid!',
+                        ),
+                        backgroundColor: AppColors.paid,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    _navigateTo(AppScreen.home);
+                  }
                 }
               },
               onEdit: () {
@@ -291,23 +353,56 @@ class _AppNavigatorState extends State<AppNavigator> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Bill'),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    icon: const Icon(
+                      Icons.delete_forever_rounded,
+                      color: AppColors.alert,
+                      size: 40,
+                    ),
+                    title: Text(
+                      'Delete Bill?',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    ),
                     content: Text(
-                      'Are you sure you want to delete "${freshBill.name}"?',
+                      'Are you sure you want to delete "${freshBill.name}"? This cannot be undone.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(color: AppColors.textSecondary),
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFF43F5E),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.inter(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        child: const Text('Delete'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.alert,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Delete Now',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ],
+                    actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   ),
                 );
 
@@ -316,7 +411,9 @@ class _AppNavigatorState extends State<AppNavigator> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Bill deleted'),
+                      backgroundColor: AppColors.dark,
                       behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
                     ),
                   );
                   _navigateTo(AppScreen.home);

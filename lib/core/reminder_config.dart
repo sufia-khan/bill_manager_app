@@ -170,20 +170,10 @@ class ReminderConfig {
   static bool get isDevMode => kDebugMode;
 
   /// Get the reminder offset duration based on preference
-  ///
-  /// PRODUCTION MODE:
-  /// - One day before → Duration(days: 1)
-  /// - Same day → Duration.zero
-  ///
-  /// DEV MODE (for testing):
-  /// - One day before → Duration(minutes: 1)
-  /// - Same day → Duration(seconds: 30)
   static Duration getReminderOffset(ReminderPreference preference) {
     if (isDevMode) {
-      // DEV MODE: Shorter durations for quick testing
       return _getDevModeOffset(preference);
     } else {
-      // PRODUCTION MODE: Real durations
       return _getProductionOffset(preference);
     }
   }
@@ -192,7 +182,7 @@ class ReminderConfig {
   static Duration _getProductionOffset(ReminderPreference preference) {
     switch (preference) {
       case ReminderPreference.none:
-        return Duration.zero; // No notification
+        return Duration.zero;
       case ReminderPreference.oneDayBefore:
         return const Duration(days: 1);
       case ReminderPreference.sameDay:
@@ -204,94 +194,78 @@ class ReminderConfig {
   static Duration _getDevModeOffset(ReminderPreference preference) {
     switch (preference) {
       case ReminderPreference.none:
-        return Duration.zero; // No notification
+        return Duration.zero;
       case ReminderPreference.oneDayBefore:
-        // 1 day becomes 1 minute for testing
         return const Duration(minutes: 1);
       case ReminderPreference.sameDay:
-        // Same day becomes 30 seconds for testing
         return const Duration(seconds: 30);
     }
   }
 
   /// Calculate the notification time
   ///
-  /// Formula: notifyAt = (dueDate - reminderOffset) at specified time
-  ///
-  /// In DEV MODE, the offset is relative to [referenceTime] (e.g. updatedAt)
-  /// to allow quick testing of notifications.
-  ///
-  /// Edge Case: If calculated time is in the past and [useFallback] is true,
-  /// schedule 5 seconds from now.
+  /// Strictly follows the requirement: Only return future times.
+  /// If calculated time is in the past, returns null.
   static DateTime? calculateNotificationTime({
     required DateTime dueDate,
     required ReminderPreference preference,
     int? reminderHour,
     int? reminderMinute,
     DateTime? referenceTime,
-    bool useFallback = true,
   }) {
     final now = DateTime.now();
-    final offset = getReminderOffset(preference);
+    final productionOffset = _getProductionOffset(preference);
 
-    DateTime notifyAt;
+    // 1. Calculate the ACTUAL production target time
+    DateTime targetDate = dueDate.subtract(productionOffset);
+    DateTime realNotifyAt = DateTime(
+      targetDate.year,
+      targetDate.month,
+      targetDate.day,
+      reminderHour ?? 9,
+      reminderMinute ?? 0,
+      0,
+    );
 
+    DateTime notifyAt = realNotifyAt;
+
+    // 2. Apply Dev Mode acceleration ONLY if the real time is in the past
+    // or very soon, to help test immediate feedback while respecting future dates.
     if (isDevMode) {
-      // DEV MODE: Offset is relative to when the bill was last touched (referenceTime)
-      // or now if referenceTime is not provided.
-      final base = referenceTime ?? now;
-      notifyAt = base.add(offset);
-    } else {
-      // PRODUCTION MODE: Real durations relative to dueDate
-      DateTime targetDate = dueDate.subtract(offset);
-      notifyAt = DateTime(
-        targetDate.year,
-        targetDate.month,
-        targetDate.day,
-        reminderHour ?? 9,
-        reminderMinute ?? 0,
-        0,
-      );
+      final devOffset = _getDevModeOffset(preference);
+
+      if (realNotifyAt.isAfter(now)) {
+        _logDebug('🚀 Future time detected, respecting: $realNotifyAt');
+        notifyAt = realNotifyAt;
+      } else {
+        // Accelerated path for past reminders in Dev Mode
+        final base = referenceTime ?? now;
+        notifyAt = base.add(devOffset);
+        _logDebug('⚡ Accelerated Dev Mode notification: $notifyAt');
+      }
     }
 
-    // Edge case: If notifyAt is in the past, and it's for scheduling (useFallback=true),
-    // schedule 5 seconds from now ONLY if the due date itself is in the future
-    // AND the bill was actually updated AFTER the notification time (meaning it's a new/modified bill).
-    if (useFallback && notifyAt.isBefore(now)) {
-      final today = DateTime(now.year, now.month, now.day);
-      final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
-
-      if (due.isBefore(today)) {
-        _logDebug('❌ Bill is already overdue, skipping notification');
-        return null; // Return null to indicate no notification should be scheduled
-      }
-
-      // Special isolation logic: Only fallback to 5s if the bill was touched AFTER the notification time.
-      // This prevents notifications from re-firing on every app restart/login.
-      if (referenceTime != null && referenceTime.isBefore(notifyAt)) {
-        _logDebug(
-          '⏭️ Notification time ($notifyAt) is in past and bill was NOT updated after it. Skipping fallback.',
-        );
-        return null;
-      }
-
-      notifyAt = now.add(const Duration(seconds: 5));
-      _logDebug(
-        '⚠️ Calculated time was in past but bill is new/updated, scheduling 5s fallback',
-      );
+    // 3. Strict Future Logic:
+    // If notifyAt is in the past, return null.
+    // This strictly follows the "future notifications only" requirement.
+    if (notifyAt.isBefore(now)) {
+      _logDebug('⏭️ Notification time ($notifyAt) is in the past. Skipping.');
+      return null;
     }
 
     _logDebug('📅 Due Date: $dueDate');
     _logDebug('⏰ Preference: ${preference.displayName}');
-    _logDebug('⏱️ Offset: $offset');
-    _logDebug('🔔 Notify At: $notifyAt');
-    _logDebug('🏗️ Mode: ${isDevMode ? "DEV" : "PRODUCTION"}');
+    _logDebug('⏱️ Production Offset: $productionOffset');
+    _logDebug('🔔 Final Notify At: $notifyAt');
+    _logDebug(
+      '🏗️ Mode: ${isDevMode ? "DEV (Smart Acceleration)" : "PRODUCTION"}',
+    );
 
     return notifyAt;
   }
 
-  /// Calculate the RAW notification time without fallback
-  /// Deprecated: Use calculateNotificationTime with useFallback: false
+  /// Calculate the RAW notification time
+  /// Use for display purposes if needed.
   static DateTime? calculateRawNotificationTime({
     required DateTime dueDate,
     required ReminderPreference preference,
@@ -305,7 +279,6 @@ class ReminderConfig {
       reminderHour: reminderHour,
       reminderMinute: reminderMinute,
       referenceTime: referenceTime,
-      useFallback: false,
     );
   }
 
@@ -325,7 +298,6 @@ class ReminderConfig {
       reminderHour: reminderHour,
       reminderMinute: reminderMinute,
       referenceTime: referenceTime,
-      useFallback: true,
     );
 
     if (notifyAt == null) {

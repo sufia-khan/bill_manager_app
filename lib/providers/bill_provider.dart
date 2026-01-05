@@ -145,6 +145,16 @@ class BillProvider extends ChangeNotifier {
     }
   }
 
+  /// Reschedule all notifications for all bills
+  /// Useful when global notification settings are changed
+  Future<void> rescheduleAllReminders() async {
+    _logDebug('🔔 Re-scheduling all bill reminders...');
+    for (final bill in _bills) {
+      await _rescheduleRemindersForBill(bill);
+    }
+    _logDebug('✅ All reminders re-scheduled');
+  }
+
   // ==================== BILL CRUD OPERATIONS ====================
 
   /// Add a new bill

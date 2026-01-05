@@ -63,8 +63,14 @@ class SettingsScreen extends StatelessWidget {
                             subtitle: 'Bill reminders and alerts',
                             trailing: Switch.adaptive(
                               value: settings.notificationsEnabled,
-                              onChanged: (value) {
-                                settings.toggleNotifications(value);
+                              onChanged: (value) async {
+                                await settings.toggleNotifications(value);
+                                if (value && context.mounted) {
+                                  // Re-schedule all reminders if enabled
+                                  context
+                                      .read<BillProvider>()
+                                      .rescheduleAllReminders();
+                                }
                               },
                               activeColor: AppColors.primary,
                             ),

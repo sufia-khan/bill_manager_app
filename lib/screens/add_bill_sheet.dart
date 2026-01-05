@@ -82,12 +82,11 @@ class _AddBillSheetState extends State<AddBillSheet> {
   Future<void> _selectDate() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
 
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate.isBefore(tomorrow) ? tomorrow : _selectedDate,
-      firstDate: tomorrow, // Disable past dates and today
+      initialDate: _selectedDate.isBefore(today) ? today : _selectedDate,
+      firstDate: today, // Disable past dates
       lastDate: DateTime(now.year + 5),
       builder: (context, child) {
         return Theme(

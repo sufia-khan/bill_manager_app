@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/currency.dart';
 import '../data/currencies.dart';
+import '../services/notification_service.dart';
 
 // Re-export Currency for backwards compatibility
 export '../models/currency.dart';
@@ -24,10 +25,13 @@ class SettingsProvider extends ChangeNotifier {
   static const String _firestoreCollection = 'users';
   static const String _firestoreSettingsField = 'settings';
 
+  final NotificationService _notificationService;
   SharedPreferences? _prefs;
   bool _notificationsEnabled = true;
   Currency _selectedCurrency = CurrencyData.defaultCurrency;
   bool _isLoading = true;
+
+  SettingsProvider(this._notificationService);
 
   // Getters
   bool get notificationsEnabled => _notificationsEnabled;
@@ -54,6 +58,7 @@ class SettingsProvider extends ChangeNotifier {
     if (_prefs != null) {
       // Load notifications setting (default: true)
       _notificationsEnabled = _prefs!.getBool(_notificationsKey) ?? true;
+      _notificationService.globalEnabled = _notificationsEnabled;
 
       // Load currency setting
       final savedCurrencyCode = _prefs!.getString(_currencyKey);
@@ -103,6 +108,17 @@ class SettingsProvider extends ChangeNotifier {
   /// Toggle notifications on/off
   Future<void> toggleNotifications(bool enabled) async {
     _notificationsEnabled = enabled;
+    _notificationService.globalEnabled = enabled;
+
+    if (!enabled) {
+      print('[SettingsProvider] 🗑️ Notifications disabled: Cancelling all');
+      await _notificationService.cancelAllNotifications();
+    } else {
+      print('[SettingsProvider] 🔔 Notifications enabled: Re-scheduling');
+      // Note: Full reschedule usually happens when user returns to Home/Detail
+      // which triggers loadBills or _rescheduleRemindersForBill.
+    }
+
     notifyListeners();
 
     await _prefs?.setBool(_notificationsKey, enabled);
