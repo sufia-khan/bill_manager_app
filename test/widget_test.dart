@@ -1,20 +1,36 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:bill_manager_app/main.dart';
+import 'package:bill_manager_app/screens/splash_screen.dart';
 
 void main() {
-  testWidgets('BillMinder app smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const BillMinderApp());
+  testWidgets('SplashScreen shows app name and loading indicator', (
+    WidgetTester tester,
+  ) async {
+    // 1. Test without loading indicator
+    await tester.pumpWidget(
+      const MaterialApp(home: SplashScreen(isLoading: false)),
+    );
 
-    // Verify that the app starts (splash screen shows app name)
+    // Verify app name and tagline are present
     expect(find.text('BillMinder'), findsOneWidget);
+    expect(find.text('Never miss a payment'), findsOneWidget);
+
+    // Verify loading indicator is NOT visible (opacity 0)
+    final animatedOpacity = tester.widget<AnimatedOpacity>(
+      find.byType(AnimatedOpacity),
+    );
+    expect(animatedOpacity.opacity, 0.0);
+
+    // 2. Test with loading indicator
+    await tester.pumpWidget(
+      const MaterialApp(home: SplashScreen(isLoading: true)),
+    );
+
+    // Verify loading indicator IS visible (opacity 1)
+    final animatedOpacityVisible = tester.widget<AnimatedOpacity>(
+      find.byType(AnimatedOpacity),
+    );
+    expect(animatedOpacityVisible.opacity, 1.0);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

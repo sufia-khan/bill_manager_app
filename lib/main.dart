@@ -129,6 +129,7 @@ class AppNavigator extends StatefulWidget {
 class _AppNavigatorState extends State<AppNavigator> {
   AppScreen _currentScreen = AppScreen.splash;
   Bill? _selectedBill;
+  bool _minimumSplashTimeElapsed = false;
 
   @override
   void initState() {
@@ -198,15 +199,27 @@ class _AppNavigatorState extends State<AppNavigator> {
   Widget build(BuildContext context) {
     return Consumer<BillProvider>(
       builder: (context, provider, _) {
+        // Automatic transition from splash when ready
+        if (_currentScreen == AppScreen.splash &&
+            _minimumSplashTimeElapsed &&
+            !provider.isLoading) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (provider.isSignedIn) {
+              _navigateTo(AppScreen.home);
+            } else {
+              _navigateTo(AppScreen.auth);
+            }
+          });
+        }
+
         switch (_currentScreen) {
           case AppScreen.splash:
             return SplashScreen(
+              isLoading: provider.isLoading,
               onComplete: () {
-                if (provider.isSignedIn) {
-                  _navigateTo(AppScreen.home);
-                } else {
-                  _navigateTo(AppScreen.auth);
-                }
+                setState(() {
+                  _minimumSplashTimeElapsed = true;
+                });
               },
             );
 
