@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "688115994114-fh7si8j94otnvrssf8o8nrb554kcs8hh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.bill_manager_app",
+            "certificate_hash": "c67daa6b0394dbac4e5d8f48040d11846e24c7f0"
+          }
+        },
+        {
           "client_id": "688115994114-73dhk0vhhkab0gvv6kcht1u9v9c2v2l9.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,57 @@
             {
               "client_id": "688115994114-73dhk0vhhkab0gvv6kcht1u9v9c2v2l9.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "688115994114-tm1343ons5gki1lmqbvrfhe0tbg6u3rs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.billManagerApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:688115994114:android:643810e00963d794cc611b",
+        "android_client_info": {
+          "package_name": "com.rf.billminder"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "688115994114-g0thj0dvk9ev34lke1ijelo3rju3g2q5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.rf.billminder",
+            "certificate_hash": "122ed91c59cd01a67c45e65203e005aa41ffde72"
+          }
+        },
+        {
+          "client_id": "688115994114-73dhk0vhhkab0gvv6kcht1u9v9c2v2l9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwBGBs_GioJ1_JSaUyYGRYNTbLudmY9z8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "688115994114-73dhk0vhhkab0gvv6kcht1u9v9c2v2l9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "688115994114-tm1343ons5gki1lmqbvrfhe0tbg6u3rs.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.billManagerApp"
+              }
             }
           ]
         }
