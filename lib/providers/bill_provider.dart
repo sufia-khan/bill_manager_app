@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/bill.dart';
 import '../core/reminder_config.dart';
@@ -281,6 +282,88 @@ class BillProvider extends ChangeNotifier {
 
   // ==================== AUTHENTICATION ====================
 
+  /// Shared logic to initialize the app after any successful sign-in
+  Future<void> _handlePostSignIn(User user) async {
+    _logDebug('🔐 Initializing app for user: ${user.email ?? user.uid}');
+
+    // Initialize local database with user ID
+    await _localDb.initialize(user.uid);
+    _logDebug('✅ Initialized local DB for user: ${user.uid}');
+
+    // Set user ID in notification service
+    _notificationService.setUserId(user.uid);
+
+    // Clear all existing notifications to ensure isolation for the new user
+    await _notificationService.cancelAllNotifications();
+    _logDebug('🗑️ Cleared notifications for user isolation');
+
+    // Set up sync with user ID
+    _syncService.setUserId(user.uid);
+
+    // Full sync to get cloud data
+    _logDebug('🔄 Starting full sync...');
+    await _syncService.fullSync();
+
+    // Reload bills from user's storage
+    _bills = _localDb.getAllBills();
+
+    // Schedule notifications for user's bills and persist status
+    for (final bill in _bills) {
+      await _rescheduleRemindersForBill(bill);
+    }
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Sign up with email and password
+  Future<bool> signUpWithEmail(String email, String password) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final user = await _authService.signUpWithEmail(email, password);
+      if (user != null) {
+        await _handlePostSignIn(user);
+        return true;
+      }
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _logDebug('Sign-up error: $e');
+      _error = 'Failed to sign up: ${_getReadableError(e)}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Sign in with email and password
+  Future<bool> signInWithEmail(String email, String password) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final user = await _authService.signInWithEmail(email, password);
+      if (user != null) {
+        await _handlePostSignIn(user);
+        return true;
+      }
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _logDebug('Email sign-in error: $e');
+      _error = 'Failed to sign in: ${_getReadableError(e)}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Sign in with Google
   Future<bool> signInWithGoogle({Function? onAccountSelected}) async {
     try {
@@ -296,36 +379,7 @@ class BillProvider extends ChangeNotifier {
       );
 
       if (user != null) {
-        _logDebug('🔐 Sign-in successful for user: ${user.email}');
-
-        // Initialize local database with user ID
-        await _localDb.initialize(user.uid);
-        _logDebug('✅ Initialized local DB for user: ${user.uid}');
-
-        // Set user ID in notification service
-        _notificationService.setUserId(user.uid);
-
-        // Clear all existing notifications to ensure isolation for the new user
-        await _notificationService.cancelAllNotifications();
-        _logDebug('🗑️ Cleared notifications for user isolation');
-
-        // Set up sync with user ID
-        _syncService.setUserId(user.uid);
-
-        // Full sync to get cloud data
-        _logDebug('🔄 Starting full sync...');
-        await _syncService.fullSync();
-
-        // Reload bills from user's storage
-        _bills = _localDb.getAllBills();
-
-        // Schedule notifications for user's bills and persist status
-        for (final bill in _bills) {
-          await _rescheduleRemindersForBill(bill);
-        }
-
-        _isLoading = false;
-        notifyListeners();
+        await _handlePostSignIn(user);
         return true;
       } else {
         // User cancelled the sign-in
@@ -335,8 +389,29 @@ class BillProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _logDebug('Sign-in error: $e');
+      _logDebug('Google sign-in error: $e');
       _error = 'Failed to sign in: ${_getReadableError(e)}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Send password reset email
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      await _authService.sendPasswordResetEmail(email);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _logDebug('Password reset error: $e');
+      _error = 'Failed to send reset email: ${_getReadableError(e)}';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -345,6 +420,30 @@ class BillProvider extends ChangeNotifier {
 
   /// Get a user-friendly error message
   String _getReadableError(dynamic error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'user-not-found':
+          return 'No account found with this email.';
+        case 'wrong-password':
+          return 'Incorrect password. Please try again.';
+        case 'invalid-credential':
+          // Firebase returns this for both missing user AND wrong password in modern setups
+          return 'Invalid email or password. No user found or wrong password.';
+        case 'email-already-in-use':
+          return 'An account already exists for this email.';
+        case 'invalid-email':
+          return 'The email address is not valid.';
+        case 'weak-password':
+          return 'The password provided is too weak (minimum 6 characters).';
+        case 'network-request-failed':
+          return 'Network error. Please check your connection.';
+        case 'too-many-requests':
+          return 'Too many failed attempts. Please try again later.';
+        case 'user-disabled':
+          return 'This account has been disabled.';
+      }
+    }
+
     final errorStr = error.toString();
 
     // Check for specific Google Sign-In error codes

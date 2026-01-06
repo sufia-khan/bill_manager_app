@@ -199,16 +199,21 @@ class _AppNavigatorState extends State<AppNavigator> {
   Widget build(BuildContext context) {
     return Consumer<BillProvider>(
       builder: (context, provider, _) {
-        // Automatic transition from splash when ready
-        if (_currentScreen == AppScreen.splash &&
+        // Automatic transition from splash or auth when signed in
+        if (provider.isSignedIn &&
+            (_currentScreen == AppScreen.splash && _minimumSplashTimeElapsed ||
+                _currentScreen == AppScreen.auth)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _navigateTo(AppScreen.home);
+          });
+        }
+        // Transition to auth if not signed in and splash is done
+        else if (!provider.isSignedIn &&
+            _currentScreen == AppScreen.splash &&
             _minimumSplashTimeElapsed &&
             !provider.isLoading) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (provider.isSignedIn) {
-              _navigateTo(AppScreen.home);
-            } else {
-              _navigateTo(AppScreen.auth);
-            }
+            _navigateTo(AppScreen.auth);
           });
         }
 

@@ -79,7 +79,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   /// Detect currency from device locale
-  /// Falls back to INR if detection fails
+  /// Falls back to USD if detection fails
   Currency _detectLocaleCurrency() {
     try {
       // Get device locale

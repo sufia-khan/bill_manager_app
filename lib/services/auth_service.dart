@@ -122,10 +122,53 @@ class AuthService {
     }
   }
 
+  /// Sign in with email and password
+  Future<User?> signInWithEmail(String email, String password) async {
+    try {
+      final UserCredential userCredential = await _auth
+          .signInWithEmailAndPassword(email: email, password: password);
+      return userCredential.user;
+    } on FirebaseAuthException {
+      rethrow;
+    } catch (e) {
+      print('[AuthService] Email sign-in failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Sign up with email and password
+  Future<User?> signUpWithEmail(String email, String password) async {
+    try {
+      final UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
+      return userCredential.user;
+    } on FirebaseAuthException {
+      rethrow;
+    } catch (e) {
+      print('[AuthService] Email sign-up failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException {
+      rethrow;
+    } catch (e) {
+      print('[AuthService] Password reset failed: $e');
+      rethrow;
+    }
+  }
+
   /// Sign out from Google and Firebase
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      // If signed in with Google, sign out from Google too
+      if (_googleSignIn.currentUser != null) {
+        await _googleSignIn.signOut();
+      }
       await _auth.signOut();
     } catch (_) {
       // Error intentionally ignored - sign out should not throw

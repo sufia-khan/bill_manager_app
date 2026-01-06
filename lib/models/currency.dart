@@ -33,19 +33,19 @@ class Currency {
 
   /// Get a display-friendly representation
   /// Format: [Symbol] Currency Name (ISO Code)
-  /// Example: "₹ Indian Rupee (INR)"
+  /// Example: "$ US Dollar (USD)"
   String get displayName => '$symbol  $name ($code)';
 
   /// Get a short display format
   /// Format: [Symbol] [Code]
-  /// Example: "₹ INR"
+  /// Example: "$ USD"
   String get shortDisplay => '$symbol $code';
 
   /// Get symbol with fallback to code if symbol is empty
   String get safeSymbol => symbol.isNotEmpty ? symbol : code;
 
   /// Format an amount with this currency's symbol
-  /// Example: formatAmount(1000) => "₹1,000.00"
+  /// Example: formatAmount(1000) => "$1,000.00"
   String formatAmount(double amount, {bool showSymbol = true}) {
     final formatted = amount.toStringAsFixed(decimalDigits);
     // Add thousand separators

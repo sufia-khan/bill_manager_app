@@ -12,12 +12,12 @@ import '../models/currency.dart';
 class CurrencyData {
   CurrencyData._();
 
-  /// Default currency (Indian Rupee)
+  /// Default currency (US Dollar)
   static const Currency defaultCurrency = Currency(
-    name: 'Indian Rupee',
-    code: 'INR',
-    symbol: '₹',
-    flag: '🇮🇳',
+    name: 'US Dollar',
+    code: 'USD',
+    symbol: '\$',
+    flag: '🇺🇸',
     decimalDigits: 2,
   );
 
@@ -61,8 +61,8 @@ class CurrencyData {
 
   /// Commonly used/popular currencies (shown at top)
   static const List<Currency> popular = [
-    Currency(name: 'Indian Rupee', code: 'INR', symbol: '₹', flag: '🇮🇳'),
     Currency(name: 'US Dollar', code: 'USD', symbol: '\$', flag: '🇺🇸'),
+    Currency(name: 'Indian Rupee', code: 'INR', symbol: '₹', flag: '🇮🇳'),
     Currency(name: 'Euro', code: 'EUR', symbol: '€', flag: '🇪🇺'),
     Currency(name: 'British Pound', code: 'GBP', symbol: '£', flag: '🇬🇧'),
     Currency(
@@ -87,8 +87,8 @@ class CurrencyData {
   /// Complete list of ALL world currencies (ISO 4217)
   static const List<Currency> all = [
     // Popular currencies first
-    Currency(name: 'Indian Rupee', code: 'INR', symbol: '₹', flag: '🇮🇳'),
     Currency(name: 'US Dollar', code: 'USD', symbol: '\$', flag: '🇺🇸'),
+    Currency(name: 'Indian Rupee', code: 'INR', symbol: '₹', flag: '🇮🇳'),
     Currency(name: 'Euro', code: 'EUR', symbol: '€', flag: '🇪🇺'),
     Currency(name: 'British Pound', code: 'GBP', symbol: '£', flag: '🇬🇧'),
     Currency(
