@@ -111,89 +111,6 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  void _showForgotPasswordDialog() {
-    final resetController = TextEditingController(text: _emailController.text);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          'Reset Password',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter your email address to receive a password reset link.',
-              style: GoogleFonts.inter(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: resetController,
-              decoration: InputDecoration(
-                hintText: 'Email address',
-                filled: true,
-                fillColor: AppColors.surfaceDim,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final email = resetController.text.trim();
-              if (email.isEmpty) return;
-
-              final success = await context
-                  .read<BillProvider>()
-                  .sendPasswordResetEmail(email);
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Reset email sent! Check your inbox.'
-                          : 'Failed to send reset email.',
-                    ),
-                    backgroundColor: success ? AppColors.paid : AppColors.alert,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Send Reset Link'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<BillProvider>();
@@ -307,21 +224,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         return null;
                       },
                     ),
-                    if (_authMode == AuthMode.signIn)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _showForgotPasswordDialog,
-                          child: Text(
-                            'Forgot Password?',
-                            style: GoogleFonts.inter(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
+
                     const SizedBox(height: 24),
 
                     // Main Action Button

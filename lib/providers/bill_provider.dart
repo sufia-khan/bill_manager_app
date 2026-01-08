@@ -8,6 +8,7 @@ import '../services/smart_sync_service.dart';
 import '../services/notification_service.dart';
 import '../services/auth_service.dart';
 import '../services/account_deletion_service.dart';
+import '../providers/settings_provider.dart';
 
 /// Bill Provider - State management for all bill operations
 ///
@@ -25,6 +26,7 @@ class BillProvider extends ChangeNotifier {
   final NotificationService _notificationService;
   final AuthService _authService;
   final AccountDeletionService _accountDeletionService;
+  final SettingsProvider _settingsProvider;
 
   final Uuid _uuid = const Uuid();
 
@@ -38,10 +40,12 @@ class BillProvider extends ChangeNotifier {
     required SmartSyncService syncService,
     required NotificationService notificationService,
     required AuthService authService,
+    required SettingsProvider settingsProvider,
   }) : _localDb = localDb,
        _syncService = syncService,
        _notificationService = notificationService,
        _authService = authService,
+       _settingsProvider = settingsProvider,
        _accountDeletionService = AccountDeletionService(notificationService);
 
   // ==================== GETTERS ====================
@@ -304,6 +308,11 @@ class BillProvider extends ChangeNotifier {
     _logDebug('🔄 Starting full sync...');
     await _syncService.fullSync();
 
+    // Sync user's settings from Firestore (currency, notifications)
+    _logDebug('⚙️ Syncing user settings...');
+    await _settingsProvider.syncFromFirestore();
+    _logDebug('✅ User settings synced');
+
     // Reload bills from user's storage
     _bills = _localDb.getAllBills();
 
@@ -488,6 +497,10 @@ class BillProvider extends ChangeNotifier {
 
       // Clear sync user ID
       _syncService.setUserId(null);
+
+      // Reset settings to defaults for next user
+      await _settingsProvider.resetToDefaults();
+      _logDebug('Settings reset to defaults');
 
       _logDebug('Sign out complete');
       notifyListeners();

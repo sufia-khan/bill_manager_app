@@ -4,6 +4,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/bill.dart';
 import '../core/reminder_config.dart';
+import 'permission_service.dart';
 
 /// Notification Service - Manages local bill reminders
 ///
@@ -58,6 +59,10 @@ class NotificationService {
         );
       },
     );
+
+    // Request permissions for Android 13+ and handle iOS permissions
+    // This will show the dialog on first launch
+    await requestPermissions();
 
     _isInitialized = true;
     print('[NotificationService] ✅ Initialization complete');
@@ -323,5 +328,12 @@ class NotificationService {
     );
 
     print('[NotificationService] 🧪 === TEST NOTIFICATION END ===');
+  }
+
+  /// Request notification permissions
+  Future<void> requestPermissions() async {
+    print('[NotificationService] 🔐 Requesting permissions...');
+    final permissionService = PermissionService();
+    await permissionService.requestNotificationPermission();
   }
 }

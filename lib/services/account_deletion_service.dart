@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,13 @@ class AccountDeletionService {
 
   AccountDeletionService(this._notificationService);
 
+  /// Debug logging helper - only prints in debug mode
+  void _log(String message) {
+    if (kDebugMode) {
+      print('[AccountDeletionService] $message');
+    }
+  }
+
   /// Delete the current user's account and all data permanently
   ///
   /// [onProgress] - Optional callback to report deletion progress
@@ -52,59 +60,53 @@ class AccountDeletionService {
     }
 
     final userId = user.uid;
-    print(
-      '[AccountDeletionService] 🗑️ Starting account deletion for user: $userId',
-    );
+    _log('🗑️ Starting account deletion for user: $userId');
 
     try {
       // ========================================
       // STEP 1: Cancel all local notifications
       // ========================================
       onProgress?.call('Cancelling notifications...');
-      print('[AccountDeletionService] Step 1/5: Cancelling notifications');
+      _log('Step 1/5: Cancelling notifications');
       await _notificationService.cancelAllNotifications();
-      print('[AccountDeletionService] ✅ Notifications cancelled');
+      _log('✅ Notifications cancelled');
 
       // ========================================
       // STEP 2: Delete Firestore data
       // ========================================
       onProgress?.call('Deleting cloud data...');
-      print('[AccountDeletionService] Step 2/5: Deleting Firestore data');
+      _log('Step 2/5: Deleting Firestore data');
       await _deleteFirestoreData(userId);
-      print('[AccountDeletionService] ✅ Firestore data deleted');
+      _log('✅ Firestore data deleted');
 
       // ========================================
       // STEP 3: Delete Firebase Auth account
       // ========================================
       onProgress?.call('Deleting account...');
-      print(
-        '[AccountDeletionService] Step 3/5: Deleting Firebase Auth account',
-      );
+      _log('Step 3/5: Deleting Firebase Auth account');
       await _deleteFirebaseAuthAccount(user, onReauthRequired);
-      print('[AccountDeletionService] ✅ Firebase Auth account deleted');
+      _log('✅ Firebase Auth account deleted');
 
       // ========================================
       // STEP 4: Clear all Hive boxes
       // ========================================
       onProgress?.call('Clearing local data...');
-      print('[AccountDeletionService] Step 4/5: Clearing Hive boxes');
+      _log('Step 4/5: Clearing Hive boxes');
       await _clearAllHiveBoxes();
-      print('[AccountDeletionService] ✅ Hive boxes cleared');
+      _log('✅ Hive boxes cleared');
 
       // ========================================
       // STEP 5: Clear SharedPreferences
       // ========================================
       onProgress?.call('Finalizing...');
-      print('[AccountDeletionService] Step 5/5: Clearing SharedPreferences');
+      _log('Step 5/5: Clearing SharedPreferences');
       await _clearSharedPreferences();
-      print('[AccountDeletionService] ✅ SharedPreferences cleared');
+      _log('✅ SharedPreferences cleared');
 
-      print(
-        '[AccountDeletionService] 🎉 Account deletion completed successfully',
-      );
+      _log('🎉 Account deletion completed successfully');
     } catch (e, stackTrace) {
-      print('[AccountDeletionService] ❌ Error during account deletion: $e');
-      print('[AccountDeletionService] Stack trace: $stackTrace');
+      _log('❌ Error during account deletion: $e');
+      _log('Stack trace: $stackTrace');
       rethrow;
     }
   }
@@ -118,9 +120,7 @@ class AccountDeletionService {
       await user.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
-        print(
-          '[AccountDeletionService] 🔐 Re-authentication required, attempting...',
-        );
+        _log('🔐 Re-authentication required, attempting...');
 
         if (onReauthRequired == null) {
           throw Exception(
@@ -134,7 +134,7 @@ class AccountDeletionService {
           throw Exception('Re-authentication was cancelled by user');
         }
 
-        print('[AccountDeletionService] ✅ Re-authenticated, retrying delete');
+        _log('✅ Re-authenticated, retrying delete');
 
         // Retry deletion after successful re-authentication
         // Get fresh user reference after re-auth
@@ -159,9 +159,7 @@ class AccountDeletionService {
       final billsCollection = userDoc.collection('bills');
       final billsSnapshot = await billsCollection.get();
 
-      print(
-        '[AccountDeletionService] Found ${billsSnapshot.docs.length} bills to delete',
-      );
+      _log('Found ${billsSnapshot.docs.length} bills to delete');
 
       // Delete bills in batches (Firestore limit is 500 per batch)
       final batch = _firestore.batch();
@@ -186,11 +184,9 @@ class AccountDeletionService {
       // Delete the user document itself
       await userDoc.delete();
 
-      print(
-        '[AccountDeletionService] Deleted user document and ${billsSnapshot.docs.length} bills',
-      );
+      _log('Deleted user document and ${billsSnapshot.docs.length} bills');
     } catch (e) {
-      print('[AccountDeletionService] Error deleting Firestore data: $e');
+      _log('Error deleting Firestore data: $e');
       throw Exception('Failed to delete cloud data: $e');
     }
   }
@@ -199,7 +195,7 @@ class AccountDeletionService {
   /// This ensures no local data remains after account deletion
   Future<void> _clearAllHiveBoxes() async {
     try {
-      print('[AccountDeletionService] Clearing all Hive boxes');
+      _log('Clearing all Hive boxes');
 
       // Clear and close all currently open boxes
       // We need to get a list of box names before closing them
@@ -219,19 +215,19 @@ class AccountDeletionService {
             final box = Hive.box(boxName);
             await box.clear();
             await box.close();
-            print('[AccountDeletionService] Cleared and closed box: $boxName');
+            _log('Cleared and closed box: $boxName');
           }
           await Hive.deleteBoxFromDisk(boxName);
-          print('[AccountDeletionService] Deleted box from disk: $boxName');
+          _log('Deleted box from disk: $boxName');
         } catch (e) {
-          print('[AccountDeletionService] Error deleting box $boxName: $e');
+          _log('Error deleting box $boxName: $e');
           // Continue with other boxes even if one fails
         }
       }
 
-      print('[AccountDeletionService] All Hive boxes cleared');
+      _log('All Hive boxes cleared');
     } catch (e) {
-      print('[AccountDeletionService] Error clearing Hive boxes: $e');
+      _log('Error clearing Hive boxes: $e');
       throw Exception('Failed to clear local database: $e');
     }
   }
@@ -242,9 +238,9 @@ class AccountDeletionService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      print('[AccountDeletionService] SharedPreferences cleared');
+      _log('SharedPreferences cleared');
     } catch (e) {
-      print('[AccountDeletionService] Error clearing SharedPreferences: $e');
+      _log('Error clearing SharedPreferences: $e');
       throw Exception('Failed to clear preferences: $e');
     }
   }

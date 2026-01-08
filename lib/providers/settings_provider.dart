@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,12 +15,13 @@ export '../data/currencies.dart' show CurrencyData;
 /// Features:
 /// - Notification toggle with persistence
 /// - Currency selection with full ISO 4217 support
-/// - Locale-based default currency detection
+/// - Default currency: USD (US Dollar)
 /// - Local persistence with SharedPreferences
 /// - Firestore sync for authenticated users
 class SettingsProvider extends ChangeNotifier {
   static const String _notificationsKey = 'notifications_enabled';
   static const String _currencyKey = 'selected_currency';
+  static const String _currencySetupCompleteKey = 'currency_setup_complete';
   static const String _firestoreCollection = 'users';
   static const String _firestoreSettingsField = 'settings';
 
@@ -30,6 +30,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _notificationsEnabled = true;
   Currency _selectedCurrency = CurrencyData.defaultCurrency;
   bool _isLoading = true;
+  bool _needsCurrencySetup = false;
 
   SettingsProvider(this._notificationService);
 
@@ -42,15 +43,18 @@ class SettingsProvider extends ChangeNotifier {
   List<Currency> get availableCurrencies => CurrencyData.all;
   List<Currency> get popularCurrencies => CurrencyData.popular;
 
+  /// Whether the user needs to complete initial currency setup
+  /// True only on first launch when currency hasn't been explicitly chosen
+  bool get needsCurrencySetup => _needsCurrencySetup;
+
   /// Initialize the settings provider
-  /// Detects device locale for default currency
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
     await _loadSettings();
   }
 
   /// Load settings from SharedPreferences
-  /// Falls back to locale-based currency if not set
+  /// Uses USD as default if no currency is saved
   Future<void> _loadSettings() async {
     _isLoading = true;
     notifyListeners();
@@ -60,49 +64,27 @@ class SettingsProvider extends ChangeNotifier {
       _notificationsEnabled = _prefs!.getBool(_notificationsKey) ?? true;
       _notificationService.globalEnabled = _notificationsEnabled;
 
-      // Load currency setting
+      // Check if currency setup has been completed
+      final currencySetupComplete =
+          _prefs!.getBool(_currencySetupCompleteKey) ?? false;
+      _needsCurrencySetup = !currencySetupComplete;
+
+      // Load currency setting (default: USD)
       final savedCurrencyCode = _prefs!.getString(_currencyKey);
 
       if (savedCurrencyCode != null && savedCurrencyCode.isNotEmpty) {
         // Use saved currency
         _selectedCurrency = CurrencyData.fromCode(savedCurrencyCode);
       } else {
-        // Detect from device locale
-        _selectedCurrency = _detectLocaleCurrency();
-        // Save the detected currency
+        // Use default currency (USD)
+        _selectedCurrency = CurrencyData.defaultCurrency;
+        // Save the default currency
         await _prefs!.setString(_currencyKey, _selectedCurrency.code);
       }
     }
 
     _isLoading = false;
     notifyListeners();
-  }
-
-  /// Detect currency from device locale
-  /// Falls back to USD if detection fails
-  Currency _detectLocaleCurrency() {
-    try {
-      // Get device locale
-      final locale = ui.PlatformDispatcher.instance.locale;
-      final localeString = '${locale.languageCode}_${locale.countryCode ?? ''}';
-
-      if (kDebugMode) {
-        print('[SettingsProvider] Detected locale: $localeString');
-      }
-
-      final detectedCurrency = CurrencyData.fromLocale(localeString);
-
-      if (kDebugMode) {
-        print('[SettingsProvider] Detected currency: ${detectedCurrency.code}');
-      }
-
-      return detectedCurrency;
-    } catch (e) {
-      if (kDebugMode) {
-        print('[SettingsProvider] Locale detection failed: $e');
-      }
-      return CurrencyData.defaultCurrency;
-    }
   }
 
   /// Toggle notifications on/off
@@ -115,6 +97,8 @@ class SettingsProvider extends ChangeNotifier {
       await _notificationService.cancelAllNotifications();
     } else {
       print('[SettingsProvider] 🔔 Notifications enabled: Re-scheduling');
+      // Request permissions (Android 13+) if they are being turned on
+      await _notificationService.requestPermissions();
       // Note: Full reschedule usually happens when user returns to Home/Detail
       // which triggers loadBills or _rescheduleRemindersForBill.
     }
@@ -135,6 +119,19 @@ class SettingsProvider extends ChangeNotifier {
 
     if (kDebugMode) {
       print('[SettingsProvider] Currency changed to: ${currency.code}');
+    }
+  }
+
+  /// Mark currency setup as complete
+  /// Call this after the user has chosen their currency on first launch
+  Future<void> completeCurrencySetup() async {
+    _needsCurrencySetup = false;
+    notifyListeners();
+
+    await _prefs?.setBool(_currencySetupCompleteKey, true);
+
+    if (kDebugMode) {
+      print('[SettingsProvider] Currency setup completed');
     }
   }
 
@@ -178,6 +175,24 @@ class SettingsProvider extends ChangeNotifier {
       if (kDebugMode) {
         print('[SettingsProvider] Failed to sync settings: $e');
       }
+    }
+  }
+
+  /// Reset settings to defaults (used during sign-out)
+  /// Clears local preferences and resets to default values
+  Future<void> resetToDefaults() async {
+    _selectedCurrency = CurrencyData.defaultCurrency;
+    _notificationsEnabled = true;
+    _needsCurrencySetup = true; // Reset so next user sees the setup prompt
+    notifyListeners();
+
+    // Clear local preferences
+    await _prefs?.remove(_currencyKey);
+    await _prefs?.remove(_notificationsKey);
+    await _prefs?.remove(_currencySetupCompleteKey);
+
+    if (kDebugMode) {
+      print('[SettingsProvider] Settings reset to defaults');
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -117,7 +118,9 @@ class AuthService {
       await user.reauthenticateWithCredential(credential);
       return true;
     } catch (e) {
-      print('[AuthService] Re-authentication failed: $e');
+      if (kDebugMode) {
+        print('[AuthService] Re-authentication failed: $e');
+      }
       rethrow;
     }
   }
@@ -131,7 +134,9 @@ class AuthService {
     } on FirebaseAuthException {
       rethrow;
     } catch (e) {
-      print('[AuthService] Email sign-in failed: $e');
+      if (kDebugMode) {
+        print('[AuthService] Email sign-in failed: $e');
+      }
       rethrow;
     }
   }
@@ -145,7 +150,9 @@ class AuthService {
     } on FirebaseAuthException {
       rethrow;
     } catch (e) {
-      print('[AuthService] Email sign-up failed: $e');
+      if (kDebugMode) {
+        print('[AuthService] Email sign-up failed: $e');
+      }
       rethrow;
     }
   }
@@ -157,7 +164,9 @@ class AuthService {
     } on FirebaseAuthException {
       rethrow;
     } catch (e) {
-      print('[AuthService] Password reset failed: $e');
+      if (kDebugMode) {
+        print('[AuthService] Password reset failed: $e');
+      }
       rethrow;
     }
   }

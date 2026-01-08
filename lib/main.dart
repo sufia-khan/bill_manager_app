@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,7 @@ import 'screens/home_screen.dart';
 import 'screens/bill_detail_view.dart';
 import 'screens/add_bill_sheet.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/currency_setup_dialog.dart';
 import 'core/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -49,11 +51,15 @@ void main() async {
   if (authService.userId != null) {
     // User is already signed in with Google
     userId = authService.userId!;
-    print('[main] Initializing for Firebase user: $userId');
+    if (kDebugMode) {
+      print('[main] Initializing for Firebase user: $userId');
+    }
   } else {
     // User needs to sign in - initialize without user ID
     // LocalDB will be initialized after sign-in
-    print('[main] No user signed in - waiting for authentication');
+    if (kDebugMode) {
+      print('[main] No user signed in - waiting for authentication');
+    }
   }
 
   // Initialize services - they'll be properly configured after sign-in if needed
@@ -72,17 +78,24 @@ void main() async {
   // If user is already signed in, initialize their data
   if (authService.userId != null) {
     final userId = authService.userId!;
-    print('[main] User already signed in: $userId');
+    if (kDebugMode) {
+      print('[main] User already signed in: $userId');
+    }
 
     await localDb.initialize(userId);
     syncService.setUserId(userId);
     notificationService.setUserId(userId);
 
+    // Load user's settings from Firestore
+    await settingsProvider.syncFromFirestore();
+
     // Add lifecycle observer for sync
     final lifecycleObserver = AppLifecycleObserver(syncService);
     WidgetsBinding.instance.addObserver(lifecycleObserver);
   } else {
-    print('[main] No user signed in - will initialize after sign-in');
+    if (kDebugMode) {
+      print('[main] No user signed in - will initialize after sign-in');
+    }
   }
 
   runApp(
@@ -94,6 +107,7 @@ void main() async {
             syncService: syncService,
             notificationService: notificationService,
             authService: authService,
+            settingsProvider: settingsProvider,
           ),
         ),
         ChangeNotifierProvider.value(value: settingsProvider),
@@ -130,6 +144,8 @@ class _AppNavigatorState extends State<AppNavigator> {
   AppScreen _currentScreen = AppScreen.splash;
   Bill? _selectedBill;
   bool _minimumSplashTimeElapsed = false;
+  bool _currencyDialogShown =
+      false; // Track if we've shown the currency setup dialog
 
   @override
   void initState() {
@@ -195,6 +211,24 @@ class _AppNavigatorState extends State<AppNavigator> {
     );
   }
 
+  /// Show currency setup dialog if this is the first launch
+  /// and user hasn't set their currency preference yet
+  void _showCurrencySetupIfNeeded() {
+    if (_currencyDialogShown) return;
+
+    final settings = context.read<SettingsProvider>();
+    if (!settings.needsCurrencySetup) return;
+
+    _currencyDialogShown = true;
+
+    // Delay slightly to ensure the home screen is fully rendered
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        CurrencySetupDialog.show(context);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<BillProvider>(
@@ -205,6 +239,7 @@ class _AppNavigatorState extends State<AppNavigator> {
                 _currentScreen == AppScreen.auth)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _navigateTo(AppScreen.home);
+            _showCurrencySetupIfNeeded();
           });
         }
         // Transition to auth if not signed in and splash is done
@@ -358,7 +393,7 @@ class _AppNavigatorState extends State<AppNavigator> {
                 }
               },
               onEdit: () {
-                // TODO: Implement edit functionality
+                // Edit feature not available in v1.0
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Edit feature coming soon!'),

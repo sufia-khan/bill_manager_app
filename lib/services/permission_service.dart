@@ -16,6 +16,10 @@ class PermissionService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
+  static final PermissionService _instance = PermissionService._internal();
+  factory PermissionService() => _instance;
+  PermissionService._internal();
+
   /// Check if the app can schedule exact alarms
   ///
   /// Returns true if:

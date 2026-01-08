@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -276,7 +277,9 @@ class SmartSyncService {
 
       await _localDb.setLastSyncTime(DateTime.now());
     } catch (e) {
-      print('Error downloading bills: $e');
+      if (kDebugMode) {
+        print('Error downloading bills: $e');
+      }
     }
   }
 
@@ -298,7 +301,9 @@ class SmartSyncService {
     try {
       await _billsCollection.doc(billId).delete();
     } catch (e) {
-      print('Error deleting bill from cloud: $e');
+      if (kDebugMode) {
+        print('Error deleting bill from cloud: $e');
+      }
     }
   }
 
