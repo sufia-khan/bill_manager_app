@@ -144,8 +144,6 @@ class _AppNavigatorState extends State<AppNavigator> {
   AppScreen _currentScreen = AppScreen.splash;
   Bill? _selectedBill;
   bool _minimumSplashTimeElapsed = false;
-  bool _currencyDialogShown =
-      false; // Track if we've shown the currency setup dialog
 
   @override
   void initState() {
@@ -214,12 +212,8 @@ class _AppNavigatorState extends State<AppNavigator> {
   /// Show currency setup dialog if this is the first launch
   /// and user hasn't set their currency preference yet
   void _showCurrencySetupIfNeeded() {
-    if (_currencyDialogShown) return;
-
     final settings = context.read<SettingsProvider>();
     if (!settings.needsCurrencySetup) return;
-
-    _currencyDialogShown = true;
 
     // Delay slightly to ensure the home screen is fully rendered
     Future.delayed(const Duration(milliseconds: 500), () {

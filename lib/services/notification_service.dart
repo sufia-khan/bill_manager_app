@@ -133,30 +133,43 @@ class NotificationService {
           '[NotificationService] ⏭️ One day before notification already sent, skipping',
         );
       } else {
-        final notificationTime = _calculateNotificationTime(
-          bill,
-          oneDayBefore: true,
+        final notificationId = bill.id.hashCode.abs() % 100000;
+
+        // CHECK: Is this notification already scheduled?
+        final alreadyScheduled = await _isNotificationAlreadyScheduled(
+          notificationId,
         );
 
-        if (notificationTime != null) {
-          await _scheduleNotification(
-            bill: bill,
-            notificationId: bill.id.hashCode.abs() % 100000,
-            notificationTime: notificationTime,
-            title: 'Bill Due Tomorrow',
-            body: '${bill.name} - ${bill.formattedAmount} is due tomorrow',
-          );
-          scheduledCount++;
+        if (alreadyScheduled) {
           print(
-            '[NotificationService] 🔔 Scheduled ONE DAY BEFORE for: $notificationTime',
+            '[NotificationService] ⏭️ One day before notification already scheduled in system, skipping',
           );
         } else {
-          // If null is returned, it means it's either overdue or in the past
-          // Mark as handled (true) so we don't keep trying to schedule it
-          results['oneDayBefore'] = true;
-          print(
-            '[NotificationService] ⏭️ One day before notification skipped (past/missing), marking as handled',
+          final notificationTime = _calculateNotificationTime(
+            bill,
+            oneDayBefore: true,
           );
+
+          if (notificationTime != null) {
+            await _scheduleNotification(
+              bill: bill,
+              notificationId: notificationId,
+              notificationTime: notificationTime,
+              title: 'Bill Due Tomorrow',
+              body: '${bill.name} - ${bill.formattedAmount} is due tomorrow',
+            );
+            scheduledCount++;
+            print(
+              '[NotificationService] 🔔 Scheduled ONE DAY BEFORE for: $notificationTime',
+            );
+          } else {
+            // If null is returned, it means it's either overdue or in the past
+            // Mark as handled (true) so we don't keep trying to schedule it
+            results['oneDayBefore'] = true;
+            print(
+              '[NotificationService] ⏭️ One day before notification skipped (past/missing), marking as handled',
+            );
+          }
         }
       }
     }
@@ -168,30 +181,43 @@ class NotificationService {
           '[NotificationService] ⏭️ Same day notification already sent, skipping',
         );
       } else {
-        final notificationTime = _calculateNotificationTime(
-          bill,
-          oneDayBefore: false,
+        final notificationId = (bill.id.hashCode.abs() % 100000) + 1;
+
+        // CHECK: Is this notification already scheduled?
+        final alreadyScheduled = await _isNotificationAlreadyScheduled(
+          notificationId,
         );
 
-        if (notificationTime != null) {
-          await _scheduleNotification(
-            bill: bill,
-            notificationId: (bill.id.hashCode.abs() % 100000) + 1,
-            notificationTime: notificationTime,
-            title: 'Bill Due Today',
-            body: '${bill.name} - ${bill.formattedAmount} is due today!',
-          );
-          scheduledCount++;
+        if (alreadyScheduled) {
           print(
-            '[NotificationService] 🔔 Scheduled SAME DAY for: $notificationTime',
+            '[NotificationService] ⏭️ Same day notification already scheduled in system, skipping',
           );
         } else {
-          // If null is returned, it means it's either overdue or in the past
-          // Mark as handled (true) so we don't keep trying to schedule it
-          results['sameDay'] = true;
-          print(
-            '[NotificationService] ⏭️ Same day notification skipped (past/missing), marking as handled',
+          final notificationTime = _calculateNotificationTime(
+            bill,
+            oneDayBefore: false,
           );
+
+          if (notificationTime != null) {
+            await _scheduleNotification(
+              bill: bill,
+              notificationId: notificationId,
+              notificationTime: notificationTime,
+              title: 'Bill Due Today',
+              body: '${bill.name} - ${bill.formattedAmount} is due today!',
+            );
+            scheduledCount++;
+            print(
+              '[NotificationService] 🔔 Scheduled SAME DAY for: $notificationTime',
+            );
+          } else {
+            // If null is returned, it means it's either overdue or in the past
+            // Mark as handled (true) so we don't keep trying to schedule it
+            results['sameDay'] = true;
+            print(
+              '[NotificationService] ⏭️ Same day notification skipped (past/missing), marking as handled',
+            );
+          }
         }
       }
     }
@@ -221,6 +247,12 @@ class NotificationService {
     );
   }
 
+  /// Check if a notification with the given ID is already scheduled
+  Future<bool> _isNotificationAlreadyScheduled(int notificationId) async {
+    final pending = await _notifications.pendingNotificationRequests();
+    return pending.any((notification) => notification.id == notificationId);
+  }
+
   /// Helper method to schedule a single notification
   Future<void> _scheduleNotification({
     required Bill bill,
@@ -236,6 +268,10 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.max,
       icon: '@mipmap/ic_launcher',
+      autoCancel: true, // Auto-dismiss when tapped
+      ongoing: false, // Can be swiped away
+      groupKey: 'bill_reminders_group', // Group all bill notifications
+      setAsGroupSummary: false, // Individual notifications, not summary
     );
 
     const iosDetails = DarwinNotificationDetails(
@@ -274,11 +310,15 @@ class NotificationService {
     }
   }
 
-  /// Cancel notifications for a bill
+  /// Cancel notifications for a bill (both scheduled and active)
   Future<void> cancelBillReminders(String billId) async {
     final baseId = billId.hashCode.abs() % 100000;
+    // Cancel scheduled notifications
     await _notifications.cancel(baseId);
     await _notifications.cancel(baseId + 1);
+    print(
+      '[NotificationService] 🗑️ Cancelled notifications for bill: $billId (IDs: $baseId, ${baseId + 1})',
+    );
   }
 
   /// Cancel all notifications
@@ -335,5 +375,10 @@ class NotificationService {
     print('[NotificationService] 🔐 Requesting permissions...');
     final permissionService = PermissionService();
     await permissionService.requestNotificationPermission();
+  }
+
+  /// Get all scheduled notifications (for debugging)
+  Future<List<PendingNotificationRequest>> getScheduledNotifications() async {
+    return await _notifications.pendingNotificationRequests();
   }
 }

@@ -129,6 +129,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
 
     await _prefs?.setBool(_currencySetupCompleteKey, true);
+    await _syncToFirestore(); // Sync to Firestore for user-specific persistence
 
     if (kDebugMode) {
       print('[SettingsProvider] Currency setup completed');
@@ -164,6 +165,7 @@ class SettingsProvider extends ChangeNotifier {
             _firestoreSettingsField: {
               'notificationsEnabled': _notificationsEnabled,
               'currencyCode': _selectedCurrency.code,
+              'currencySetupComplete': !_needsCurrencySetup,
               'updatedAt': FieldValue.serverTimestamp(),
             },
           }, SetOptions(merge: true));
@@ -207,6 +209,9 @@ class SettingsProvider extends ChangeNotifier {
           .doc(user.uid)
           .get();
 
+      // Track if we found setup complete status in Firestore
+      bool foundSetupStatus = false;
+
       if (doc.exists && doc.data() != null) {
         final settings =
             doc.data()![_firestoreSettingsField] as Map<String, dynamic>?;
@@ -225,13 +230,33 @@ class SettingsProvider extends ChangeNotifier {
             await _prefs?.setString(_currencyKey, currencyCode);
           }
 
-          notifyListeners();
+          // Load currency setup complete status
+          if (settings['currencySetupComplete'] != null) {
+            final setupComplete = settings['currencySetupComplete'] as bool;
+            _needsCurrencySetup = !setupComplete;
+            await _prefs?.setBool(_currencySetupCompleteKey, setupComplete);
+            foundSetupStatus = true;
+          }
 
           if (kDebugMode) {
             print('[SettingsProvider] Settings loaded from Firestore');
           }
         }
       }
+
+      // If no setup status was found in Firestore, this is a new user or
+      // a user who hasn't completed setup - ensure dialog will show
+      if (!foundSetupStatus) {
+        _needsCurrencySetup = true;
+        await _prefs?.setBool(_currencySetupCompleteKey, false);
+        if (kDebugMode) {
+          print(
+            '[SettingsProvider] New user or incomplete setup - will show currency dialog',
+          );
+        }
+      }
+
+      notifyListeners();
     } catch (e) {
       if (kDebugMode) {
         print('[SettingsProvider] Failed to load settings from Firestore: $e');
