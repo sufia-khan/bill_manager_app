@@ -122,10 +122,12 @@ class BillProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Clear any leftover notifications before loading new user's data
-      // This ensures strict user isolation
-      await _notificationService.cancelAllNotifications();
-      print('[BillProvider] 🗑️ Cleared previous notifications for isolation');
+      // NOTE: We do NOT cancel notifications here anymore
+      // Notifications should persist across app restarts
+      // They are only cancelled when:
+      // 1. User switches accounts (_handlePostSignIn)
+      // 2. User signs out (signOut)
+      // 3. User manually dismisses them
 
       _bills = _localDb.getAllBills();
       print('[BillProvider] ✅ Loaded ${_bills.length} bills');
