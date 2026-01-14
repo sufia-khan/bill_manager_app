@@ -35,6 +35,9 @@ class BillProvider extends ChangeNotifier {
   bool _isDeleting = false;
   String? _error;
 
+  /// Track the last logged-in user ID to detect account switching
+  String? _lastLoggedInUserId;
+
   BillProvider({
     required LocalDbService localDb,
     required SmartSyncService syncService,
@@ -219,7 +222,10 @@ class BillProvider extends ChangeNotifier {
       _bills = _localDb.getAllBills();
       notifyListeners();
 
-      // Reschedule notifications
+      // Cancel existing notifications since settings may have changed
+      await _notificationService.cancelBillReminders(bill.id);
+
+      // Reschedule notifications with new settings
       await _rescheduleRemindersForBill(bill);
 
       // Schedule debounced sync
@@ -292,16 +298,32 @@ class BillProvider extends ChangeNotifier {
   Future<void> _handlePostSignIn(User user) async {
     _logDebug('🔐 Initializing app for user: ${user.email ?? user.uid}');
 
+    // Check if this is a different user than last time
+    final isDifferentUser =
+        _lastLoggedInUserId != null && _lastLoggedInUserId != user.uid;
+
+    if (isDifferentUser) {
+      _logDebug(
+        '🔄 Different user detected (was: $_lastLoggedInUserId, now: ${user.uid})',
+      );
+      // Clear all existing notifications ONLY when switching accounts
+      await _notificationService.cancelAllNotifications();
+      _logDebug('🗑️ Cleared previous user\'s notifications');
+    } else if (_lastLoggedInUserId == user.uid) {
+      _logDebug('✅ Same user re-login, keeping notifications');
+    } else {
+      _logDebug('🆕 First login, no notifications to clear');
+    }
+
+    // Update the last logged-in user ID
+    _lastLoggedInUserId = user.uid;
+
     // Initialize local database with user ID
     await _localDb.initialize(user.uid);
     _logDebug('✅ Initialized local DB for user: ${user.uid}');
 
     // Set user ID in notification service
     _notificationService.setUserId(user.uid);
-
-    // Clear all existing notifications to ensure isolation for the new user
-    await _notificationService.cancelAllNotifications();
-    _logDebug('🗑️ Cleared notifications for user isolation');
 
     // Set up sync with user ID
     _syncService.setUserId(user.uid);
@@ -486,9 +508,11 @@ class BillProvider extends ChangeNotifier {
     try {
       _logDebug('Starting sign out process...');
 
-      // Cancel all notifications for current user
-      await _notificationService.cancelAllNotifications();
-      _logDebug('Cancelled all notifications');
+      // NOTE: We do NOT clear notifications on sign out
+      // Notifications persist until:
+      // 1. User manually dismisses them
+      // 2. User logs in with a DIFFERENT account
+      // This allows the same user to see their notifications after re-login
 
       // Clear in-memory state
       _bills = [];

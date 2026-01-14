@@ -114,9 +114,13 @@ class NotificationService {
     final now = DateTime.now();
     print('[NotificationService] Current Time: $now');
 
-    // Cancel any existing notifications for this bill
-    await cancelBillReminders(bill.id);
-    print('[NotificationService] 🗑️ Cancelled any existing notifications');
+    // NOTE: We don't cancel existing notifications here anymore.
+    // The _isNotificationAlreadyScheduled() checks below will prevent duplicates.
+    // Notifications are only cancelled when:
+    // 1. Bill settings are explicitly changed (updateBill)
+    // 2. Bill is marked as paid (markBillPaid)
+    // 3. Bill is deleted (deleteBill)
+    // 4. User switches accounts (_handlePostSignIn)
 
     // Determine which notifications to schedule based on preference
     final bool scheduleOneDayBefore =
