@@ -508,11 +508,11 @@ class BillProvider extends ChangeNotifier {
     try {
       _logDebug('Starting sign out process...');
 
-      // NOTE: We do NOT clear notifications on sign out
-      // Notifications persist until:
-      // 1. User manually dismisses them
-      // 2. User logs in with a DIFFERENT account
-      // This allows the same user to see their notifications after re-login
+      // CRITICAL: Cancel all notifications on sign out
+      // This prevents notifications from leaking to different users who log in after
+      // The same user re-logging in will have their notifications re-scheduled
+      await _notificationService.cancelAllNotifications();
+      _logDebug('🗑️ Cleared all notifications on sign out');
 
       // Clear in-memory state
       _bills = [];
